@@ -1,0 +1,156 @@
+//@version=5
+indicator("The Strat Helper", shorttitle="Strat", overlay=true)
+
+//------------------
+// Inputs
+//------------------
+
+// Input for the number of candles to use in trend calculation
+num_candles = input.int(1, title="Number of Candles", minval=1, group="Trend Table")
+
+// Input to enable or disable candle coloring
+enableCandleColors = input.bool(true, title="Enable Candle Colors", group="Appearance")
+
+// Define the styles, colors, and text for plotchar
+_oneBarChar = "1"  // Character for inside bars
+_twoUpBarChar = "2u" // Character for outside bars crossing high
+_twoDownBarChar = "2d" // Character for outside bars crossing low
+_threeBarChar = "3" // Character for outside bars
+_barCharLocation = location.abovebar  // Position of the character
+
+// Define colors for each type of candle
+_colorInsideBar = color.yellow
+_colorCrossHigh = color.green
+_colorCrossLow = color.red
+_colorOutsideBar = color.purple
+
+// Initialize global color variables
+var color globalBarColor = na
+var int candleType = na
+var string candleDirection = na
+
+// Get the high and low of the previous candle
+prevHigh = high[1]
+prevLow = low[1]
+
+// Define candlestick characteristics
+isInsideBar = (high < prevHigh) and (low > prevLow)
+isOutsideBar = (high > prevHigh) and (low < prevLow)
+crossesHigh = (high > prevHigh) and not isInsideBar
+crossesLow = (low < prevLow) and not isInsideBar
+
+// Determine the type of candle and set the global color
+if isInsideBar
+    candleType := 1
+    if enableCandleColors
+        globalBarColor := _colorInsideBar
+    else
+        globalBarColor := na  // Use TradingView's default coloring
+else if isOutsideBar
+    candleType := 3
+    if enableCandleColors
+        globalBarColor := _colorOutsideBar
+    else
+        globalBarColor := na  // Use TradingView's default coloring
+else if crossesHigh or crossesLow
+    candleType := 2
+    candleDirection := crossesHigh ? "u" : "d"
+    if enableCandleColors
+        globalBarColor := candleDirection == "u" ? _colorCrossHigh : _colorCrossLow
+    else
+        globalBarColor := na  // Use TradingView's default coloring
+
+// Apply bar color if custom coloring is enabled
+barcolor(enableCandleColors ? globalBarColor : na)
+
+// Plot characters for each type of candle
+plotchar(candleType == 1 ? 1 : na, title="Inside Bar", char=_oneBarChar, location=_barCharLocation, color=_colorInsideBar)
+plotchar(candleType == 2 and candleDirection == "u" ? 2 : na, title="Outside Bar Up", char=_twoUpBarChar, location=_barCharLocation, color=_colorCrossHigh)
+plotchar(candleType == 2 and candleDirection == "d" ? 2 : na, title="Outside Bar Down", char=_twoDownBarChar, location=_barCharLocation, color=_colorCrossLow)
+plotchar(candleType == 3 ? 3 : na, title="Outside Bar", char=_threeBarChar, location=_barCharLocation, color=_colorOutsideBar)
+
+//------------------
+// Trend Table
+//------------------
+
+// Define Timeframes
+timeframes = array.new_string(5)
+array.set(timeframes, 0, "1H")
+array.set(timeframes, 1, "4H")
+array.set(timeframes, 2, "D")
+array.set(timeframes, 3, "W")
+array.set(timeframes, 4, "M")
+
+// Fetch the high and low of the oldest candle based on num_candles for each timeframe
+fetch_timeframe_data(tf, num_candles) =>
+    [request.security(syminfo.tickerid, tf, high[num_candles], lookahead = barmerge.lookahead_off),
+     request.security(syminfo.tickerid, tf, low[num_candles], lookahead = barmerge.lookahead_off)]
+
+// Retrieve high/low values for the oldest candle for each timeframe
+[oldest_high_1H, oldest_low_1H] = fetch_timeframe_data("60", num_candles)
+[oldest_high_4H, oldest_low_4H] = fetch_timeframe_data("240", num_candles)
+[oldest_high_D, oldest_low_D] = fetch_timeframe_data("D", num_candles)
+[oldest_high_W, oldest_low_W] = fetch_timeframe_data("W", num_candles)
+[oldest_high_M, oldest_low_M] = fetch_timeframe_data("M", num_candles)
+
+// Fetch current price (close price is universal)
+current_price = close
+
+// Function: Calculate Trend using oldest candle's high and low
+trend_calculation(oldest_high, oldest_low, current_price) =>
+    if current_price > oldest_high
+        "bullish"
+    else if current_price < oldest_low
+        "bearish"
+    else
+        "IN"
+
+// Get the active timeframe of the current chart
+active_tf = timeframe.period
+
+// Initialize Storage for Timeframes and Trends
+var string[] timeframes_display = array.new_string(5, "")
+var string[] trends = array.new_string(5, "")
+
+// Create a table with 2 rows and 5 columns in the top right corner
+var table trend_table = table.new(position.top_right, 5, 2, border_width = 0)
+
+// Determine Timeframes and Trends to Display
+for i = 0 to array.size(timeframes) - 1
+    tf = array.get(timeframes, i)
+    var string trend = na
+
+    // Determine if the current timeframe should be displayed based on the active timeframe
+    show_tf = array.indexof(timeframes, tf) >= array.indexof(timeframes, active_tf)
+
+    if show_tf
+        trend := switch tf
+            "1H" => trend_calculation(oldest_high_1H, oldest_low_1H, current_price)
+            "4H" => trend_calculation(oldest_high_4H, oldest_low_4H, current_price)
+            "D" => trend_calculation(oldest_high_D, oldest_low_D, current_price)
+            "W" => trend_calculation(oldest_high_W, oldest_low_W, current_price)
+            "M" => trend_calculation(oldest_high_M, oldest_low_M, current_price)
+
+        index = array.indexof(timeframes, tf)
+        if index >= 0 and index < 5
+            array.set(timeframes_display, index, tf)
+            array.set(trends, index, trend)
+
+// Add time frames to the first row
+for i = 0 to 4
+    tf = array.get(timeframes_display, i)
+    if (tf != "")
+        table.cell(trend_table, i, 0, tf, text_color=color.white)  // Time frames
+
+// Add arrows or "IN" string to the second row based on trends
+for i = 0 to 4
+    trend = array.get(trends, i)
+    if (array.get(timeframes_display, i) != "")
+        if trend == "bullish"
+            table.cell(trend_table, i, 1, "▲", text_color=color.green) // Green Up Arrow for bullish trend
+        else if trend == "bearish"
+            table.cell(trend_table, i, 1, "▼", text_color=color.red) // Red Down Arrow for bearish trend
+        else if trend == "IN"
+            table.cell(trend_table, i, 1, "IN", text_color=color.yellow) // Yellow "IN" for inside range
+        else
+            table.cell(trend_table, i, 1, "", text_color=color.white) // Empty cell if no data

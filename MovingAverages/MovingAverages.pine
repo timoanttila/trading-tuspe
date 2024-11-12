@@ -1,0 +1,22 @@
+//@version=5
+indicator("Moving Averages", overlay=true, timeframe="", timeframe_gaps=true)
+
+ma(source, length, type) =>
+    switch type
+        "SMA" => ta.sma(source, length)
+        "EMA" => ta.ema(source, length)
+        "SMMA (RMA)" => ta.rma(source, length)
+        "WMA" => ta.wma(source, length)
+        "VWMA" => ta.vwma(source, length)
+
+// Inputs for the Moving Averages
+maType = input.string(title="MA Type", defval="SMA", options=["SMA", "EMA", "SMMA (RMA)", "WMA", "VWMA"], group="Moving Averages")
+maOffset = input.int(title="MA Offset", defval=0, minval=-500, maxval=500, group="Moving Averages")
+maLen1 = input.int(title="MA1 Length", defval=8, minval=1, group="Moving Averages")
+maLen2 = input.int(title="MA2 Length", defval=20, minval=1, group="Moving Averages")
+maLen3 = input.int(title="MA3 Length", defval=50, minval=1, group="Moving Averages")
+
+// Plot the Moving Averages
+plot(ma(close, maLen1, maType), title="MA1", color=color.orange, linewidth=1, offset=maOffset)
+plot(ma(close, maLen2, maType), title="MA2", color=color.yellow, linewidth=2, offset=maOffset)
+plot(ma(close, maLen3, maType), title="MA3", color=color.aqua, linewidth=2, offset=maOffset)
