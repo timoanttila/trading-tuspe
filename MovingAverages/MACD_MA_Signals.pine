@@ -1,0 +1,76 @@
+//@version=5
+indicator("Tuspe Special Mix", shorttitle="Tuspe", overlay=true, dynamic_requests=true)
+
+// ----------
+//  Moving Averages
+// ----------
+
+// Moving Average Calculation Function
+ma(source, length, type) =>
+    switch type
+        "SMA" => ta.sma(source, length)
+        "EMA" => ta.ema(source, length)
+        "SMMA (RMA)" => ta.rma(source, length)
+        "WMA" => ta.wma(source, length)
+        "VWMA" => ta.vwma(source, length)
+
+// Inputs for the Moving Averages
+maType = input.string(title="MA Type", defval="SMA", options=["SMA", "EMA", "SMMA (RMA)", "WMA", "VWMA"], group="Moving Averages")
+maOffset = input.int(title="MA Offset", defval=0, minval=-500, maxval=500, group="Moving Averages")
+maLen1 = input.int(title="MA1 Length", defval=8, minval=1, group="Moving Averages")
+maLen2 = input.int(title="MA2 Length", defval=20, minval=1, group="Moving Averages")
+maLen3 = input.int(title="MA3 Length", defval=50, minval=1, group="Moving Averages")
+
+// Plot the Moving Averages
+plot(ma(close, maLen1, maType), title="MA1", color=color.orange, linewidth=1, offset=maOffset)
+plot(ma(close, maLen2, maType), title="MA2", color=color.yellow, linewidth=2, offset=maOffset)
+plot(ma(close, maLen3, maType), title="MA3", color=color.aqua, linewidth=2, offset=maOffset)
+
+//------------------
+// MACD
+//------------------
+
+macdFastLength = input.int(12, title="MACD Fast Length", minval=1, group="MACD")
+macdSlowLength = input.int(26, title="MACD Slow Length", minval=1, group="MACD")
+macdSignalLength = input.int(9, title="MACD Signal Length", minval=1, group="MACD")
+
+// MACD calculation
+[macdLine, signalLine, _] = ta.macd(close, macdFastLength, macdSlowLength, macdSignalLength)
+
+//------------------
+// RSI
+//------------------
+
+rsiPeriod = input.int(14, title="RSI Length", minval=1, group="RSI")
+rsiMaPeriod = input.int(9, title="RSI MA Length", minval=1, group="RSI")
+
+rsi = ta.rsi(close, rsiPeriod)
+rsiMa = ta.sma(rsi, rsiMaPeriod)
+
+//------------------
+// Validation
+//------------------
+
+bodySize = math.abs(close - open)
+fullSize = high - low
+prevHigh = high[1]
+prevLow = low[1]
+prevFullSize = prevHigh - prevLow
+biggerBody = bodySize >= 0.65 * fullSize
+
+signalCandle = biggerBody and fullSize >= prevFullSize
+
+// Moving Average crossover conditions
+ma2 = ma(close, maLen2, maType)
+ma3 = ma(close, maLen3, maType)
+maCrossoverUp = (open < ma2 and close > ma2) or (open < ma3 and close > ma3)
+maCrossoverDown = (open > ma2 and close < ma2) or (open < ma3 and close > ma3)
+
+// MACD and RSI conditions
+longReady = signalCandle and open[1] < close and maCrossoverUp and macdLine > signalLine and rsi > rsiMa and rsi > 20
+shortReady = signalCandle and open[1] > close and maCrossoverDown and macdLine < signalLine and rsi < rsiMa and rsi < 80
+
+// Plot signals
+plotshape(series=longReady, title="LONG Signal", location=location.belowbar, color=color.green, style=shape.triangleup, size=size.small)
+plotshape(series=shortReady, title="SHORT Signal", location=location.abovebar, color=color.red, style=shape.triangledown, size=size.small)
+alertcondition(longReady or shortReady, title="New Trend", message="New trend continuing.")

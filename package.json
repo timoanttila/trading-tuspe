@@ -1,0 +1,13 @@
+{
+  "name": "tradingview-tuspe-indicator",
+  "version": "1.0.0",
+  "description": "Tuspe Special Mix is an indicator that contains many features that make day trading easier.",
+  "homepage": "https://github.com/timoanttila/tradingview-tuspe-indicator",
+  "bugs": "https://github.com/timoanttila/tradingview-tuspe-indicator/issues",
+  "author": {
+    "name": "Timo Anttila",
+    "email": "moro@tuspe.com",
+    "url": "https://timoanttila.com"
+  },
+  "license": "GPL-3.0"
+}

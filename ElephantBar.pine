@@ -1,0 +1,15 @@
+//@version=5
+indicator("Elephant Bar", overlay=true)
+
+rangeType = input.string("Open to Close", "Range Type", options = ['Open to Close', 'High to Low'], group="Displacement")
+devPeriod = input.int(100, minval = 1, title = "Deviation Period", group="Displacement")
+devMultiplier = input.int(2, minval = 0, title = "Deviation Multiplier", group="Displacement")
+
+priceRange = rangeType == "Open to Close" ? math.abs(open - close) : high - low
+rangeDeviation = ta.stdev(priceRange, devPeriod) * devMultiplier
+
+priceGap = close[1] > open[1] ? high[2] < low[0] : low[2] > high[0]
+isDisplaced = priceRange[1] > rangeDeviation[1] and priceGap
+
+barcolor(isDisplaced ? color.maroon : na, offset = -1, title="Displacement Highlight Color")
+alertcondition(isClosed and isDisplaced, title="Inside Bar", message="New Inside Bar detected!")

@@ -1,0 +1,41 @@
+//@version=5
+indicator("Moving Average Signals", shorttitle="MAS", overlay=true, dynamic_requests=true)
+
+// ----------
+//  Moving Averages
+// ----------
+
+// MA1 with fixed source as close
+len1Title = "MA1 Length"
+len1 = input.int(9, minval=5, title=len1Title)
+plot(ta.ema(close, len1), title=len1Title, color=color.yellow, linewidth=2)
+
+// MA2 with fixed source as close
+len2Title = "MA2 Length"
+len2 = input.int(50, minval=5, title=len2Title)
+plot(ta.ema(close, len2), title=len2Title, color=color.orange, linewidth=2)
+
+// MA3 with fixed source as close
+len3Title = "MA3 Length"
+len3 = input.int(200, minval=5, title=len3Title)
+out3 = ta.ema(close, len3)
+plot(out3, title=len3Title, color=close >= out3 ? color.green : color.red, linewidth=4)
+
+// VWAP calculation
+plot(ta.vwap(close), title="VWAP", color=color.white, linewidth=3)
+
+//------------------
+// Signal Service
+//------------------
+
+longCondition = (open[1] < len2 and close[1] > len2) and open > len2 and close > open and close > high[1]
+shortCondition = (open[1] > len2 and close[1] < len2) and open < len2 and close < open and close < low[1]
+
+// Plot long signal as a tiny upward triangle
+plotshape(series=longCondition, title="Long Signal", location=location.belowbar, color=color.green, style=shape.triangleup, size=size.tiny)
+
+// Plot short signal as a tiny downward triangle
+plotshape(series=shortCondition, title="Short Signal", location=location.abovebar, color=color.red, style=shape.triangledown, size=size.tiny)
+
+// Create alert condition
+alertcondition(longCondition or shortCondition, title="Long or Short Signal", message="Long or Short entry signal")

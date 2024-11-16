@@ -1,0 +1,129 @@
+//@version=5
+indicator("Tuspe Special Mix", shorttitle="Tuspe", overlay=true, dynamic_requests=true)
+
+isClosed = barstate.isconfirmed
+fullSize = high - low
+prevHigh = high[1]
+prevLow = low[1]
+prevFullSize = prevHigh - prevLow
+
+// ----------
+//  Moving Averages
+// ----------
+
+maGroup = "Simple Moving Averages"
+
+// MA1 with fixed source as close
+len1Title = "MA1 Length"
+len1 = input.int(9, minval=5, title=len1Title, group=maGroup)
+plot(ta.sma(close, len1), title=len1Title, color=color.yellow, linewidth=2)
+
+// MA2 with fixed source as close
+len2Title = "MA2 Length"
+len2 = input.int(50, minval=5, title=len2Title, group=maGroup)
+plot(ta.sma(close, len2), title=len2Title, color=color.orange, linewidth=2)
+
+// MA3 with fixed source as close
+len3Title = "MA3 Length"
+len3 = input.int(200, minval=5, title=len3Title, group=maGroup)
+out3 = ta.sma(close, len3)
+plot(out3, title=len3Title, color=close >= out3 ? color.green : color.red, linewidth=4)
+
+// VWAP calculation
+plot(ta.vwap(close), title="VWAP", color=color.white, linewidth=3)
+
+// ----------
+//  Displacement
+// ----------
+
+// Displacement Indicator Logic
+rangeType = input.string("Open to Close", "Range Type", options = ['Open to Close', 'High to Low'], group="Displacement")
+devPeriod = input.int(100, minval = 1, title = "Deviation Period", group="Displacement")
+devMultiplier = input.int(3, minval = 0, title = "Deviation Multiplier", group="Displacement")
+
+priceRange = rangeType == "Open to Close" ? math.abs(open - close) : high - low
+rangeDeviation = ta.stdev(priceRange, devPeriod) * devMultiplier
+
+priceGap = close[1] > open[1] ? high[2] < low[0] : low[2] > high[0]
+isDisplaced = priceRange[1] > rangeDeviation[1] and priceGap
+
+barcolor(isDisplaced ? color.maroon : na, offset = -1, title="Displacement Highlight Color")
+alertcondition(isDisplaced, title="Elephant Bar", message="New Displacement / Elephant Bar detected!")
+
+// ----------
+//  Inside Bar
+// ----------
+
+isInsideBar = isClosed and not isDisplaced and fullSize < prevFullSize and prevHigh > high and prevLow < low
+barcolor(isInsideBar ? color.yellow : na, title="Inside Bar")
+alertcondition(isInsideBar, title="Inside Bar", message="New Inside Bar detected!")
+alertcondition(isInsideBar or isDisplaced, title="Elephant or Inside Bar", message="New interesting bar detected!")
+
+// ----------
+//  Outside Bar
+// ----------
+
+isOutsideBar = isClosed and not isDisplaced and not isInsideBar and fullSize > prevFullSize and prevHigh < high and prevLow > low
+barcolor(isOutsideBar ? color.fuchsia : na, title="Outside Bar")
+alertcondition(isOutsideBar, title="Outside Bar", message="New Outside Bar detected!")
+
+//------------------
+// Trend table
+//------------------
+
+// == USER INPUT ==
+tableLocation = input.string(defval='Bottom', options=['Top', 'Bottom'], title='Info Table Location', group='Display', tooltip='Place information table on the top of the pane or the bottom of the pane.')
+oneSet = input.timeframe(defval='15', title='First Timeframe', group='Higher Timeframe Levels')
+twoSet = input.timeframe(defval='60', title='Second Timeframe', group='Higher Timeframe Levels')
+threeSet = input.timeframe(defval='240', title='Third Timeframe', group='Higher Timeframe Levels')
+fourSet = input.timeframe(defval='D', title='Fourth Timeframe', group='Higher Timeframe Levels')
+
+// == TREND CALCULATIONS ==
+// Request high and low levels for each timeframe
+hL_01 = request.security(syminfo.tickerid, oneSet, high[1])
+lL_01 = request.security(syminfo.tickerid, oneSet, low[1])
+hL_02 = request.security(syminfo.tickerid, twoSet, high[1])
+lL_02 = request.security(syminfo.tickerid, twoSet, low[1])
+hL_03 = request.security(syminfo.tickerid, threeSet, high[1])
+lL_03 = request.security(syminfo.tickerid, threeSet, low[1])
+hL_04 = request.security(syminfo.tickerid, fourSet, high[1])
+lL_04 = request.security(syminfo.tickerid, fourSet, low[1])
+
+// Determine trend based on the close price relative to high and low levels
+uptrendSignal1 = close > hL_01
+downtrendSignal1 = close < lL_01
+uptrendSignal2 = close > hL_02
+downtrendSignal2 = close < lL_02
+uptrendSignal3 = close > hL_03
+downtrendSignal3 = close < lL_03
+uptrendSignal4 = close > hL_04
+downtrendSignal4 = close < lL_04
+
+// == TREND TABLE PLOTTING ==
+tablePos = tableLocation == 'Top' ? position.top_right : position.bottom_left
+var table trendTable = table.new(tablePos, 4, 1, border_width=3)
+upColor = color.rgb(38, 166, 154)
+downColor = color.rgb(240, 83, 80)
+yellowColor = color.new(color.yellow, 0)
+grayColor = color.new(#999999, 0)
+
+f_fillCell(_column, _row, _cellText, _c_color) =>
+    table.cell(trendTable, _column, _row, _cellText, bgcolor=color.new(_c_color, 70), text_color=_c_color, width=6)
+
+// Define glyphs and colors based on trends
+glyph1 = uptrendSignal1 ? '▲ ' : downtrendSignal1 ? '▼ ' : ''
+glyph2 = uptrendSignal2 ? '▲ ' : downtrendSignal2 ? '▼ ' : ''
+glyph3 = uptrendSignal3 ? '▲ ' : downtrendSignal3 ? '▼ ' : ''
+glyph4 = uptrendSignal4 ? '▲ ' : downtrendSignal4 ? '▼ ' : ''
+
+color1 = uptrendSignal1 ? upColor : downtrendSignal1 ? downColor : yellowColor
+color2 = uptrendSignal2 ? upColor : downtrendSignal2 ? downColor : yellowColor
+color3 = uptrendSignal3 ? upColor : downtrendSignal3 ? downColor : yellowColor
+color4 = uptrendSignal4 ? upColor : downtrendSignal4 ? downColor : yellowColor
+
+// Update table cells on the last bar
+if barstate.islast
+    f_fillCell(0, 0, glyph1 + oneSet, color1)
+    f_fillCell(1, 0, glyph2 + twoSet, color2)
+    f_fillCell(2, 0, glyph3 + threeSet, color3)
+    f_fillCell(3, 0, glyph4 + fourSet, color4)

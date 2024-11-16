@@ -1,0 +1,101 @@
+//@version=5
+indicator("Previous Candle Alerts", overlay=true)
+
+// Input for buffer in cents
+showBufferLines = input.bool(false, title="Show price buffer zones?", group="Previous Candle")
+middleLineEnabled = input.bool(true, title="Show middle line?", group="Previous Candle")
+buffer = input.int(20, title="Buffer (in cents)", group="Previous Candle")
+middleLineTimeFrame = input.string("Chart", title="Time frame for the middle line", options=["Chart", "5 minutes", "15 minutes", "1 hour", "4 hours", "Daily", "Weekly", "Monthly"], group="Previous Candle")
+bufferLineColor = input.color(color.white, title="Buffer zones", group="Previous Candle")
+middleLineColor = input.color(color.yellow, title="Middle line", group="Previous Candle")
+
+// Convert user-friendly labels to Pine Script timeframe values
+timeFrameMap = switch middleLineTimeFrame
+    "5 minutes" => "5"
+    "15 minutes" => "15"
+    "1 hour" => "60"
+    "4 hours" => "240"
+    "Daily" => "D"
+    "Weekly" => "W"
+    "Monthly" => "M"
+    "Chart" => timeframe.period
+
+timeFrame = timeFrameMap
+
+// Define the high and low of the previous candle (based on the current chart timeframe)
+prevCandleHigh = high[1]  // High of the previous candle
+prevCandleLow = low[1]    // Low of the previous candle
+prevCandleMiddle = (prevCandleHigh + prevCandleLow) / 2
+
+// Define the buffer in terms of price
+bufferPrice = buffer * syminfo.mintick
+
+// Calculate the buffered high and low
+bufferedHighUpper = prevCandleHigh + bufferPrice
+bufferedHighLower = prevCandleHigh - bufferPrice
+bufferedLowLower = prevCandleLow - bufferPrice
+bufferedLowUpper = prevCandleLow + bufferPrice
+
+// Draw horizontal lines for the buffered zones of the previous candle (if enabled)
+var line highLine1 = na
+var line highLine2 = na
+var line lowLine1 = na
+var line lowLine2 = na
+
+lineStyle = line.style_dotted
+
+if showBufferLines
+    if na(highLine1)
+        highLine1 := line.new(x1=bar_index[1], y1=bufferedHighUpper, x2=bar_index + 2, y2=bufferedHighUpper, color=bufferLineColor, width=1, style=lineStyle)
+    if na(highLine2)
+        highLine2 := line.new(x1=bar_index[1], y1=bufferedHighLower, x2=bar_index + 2, y2=bufferedHighLower, color=bufferLineColor, width=1, style=lineStyle)
+
+    if na(lowLine1)
+        lowLine1 := line.new(x1=bar_index[1], y1=bufferedLowLower, x2=bar_index + 2, y2=bufferedLowLower, color=bufferLineColor, width=1, style=lineStyle)
+    if na(lowLine2)
+        lowLine2 := line.new(x1=bar_index[1], y1=bufferedLowUpper, x2=bar_index + 2, y2=bufferedLowUpper, color=bufferLineColor, width=1, style=lineStyle)
+
+    // Update line positions
+    line.set_xy1(highLine1, bar_index[1], bufferedHighUpper)
+    line.set_xy2(highLine1, bar_index + 2, bufferedHighUpper)
+    line.set_xy1(highLine2, bar_index[1], bufferedHighLower)
+    line.set_xy2(highLine2, bar_index + 2, bufferedHighLower)
+
+    line.set_xy1(lowLine1, bar_index[1], bufferedLowLower)
+    line.set_xy2(lowLine1, bar_index + 2, bufferedLowLower)
+    line.set_xy1(lowLine2, bar_index[1], bufferedLowUpper)
+    line.set_xy2(lowLine2, bar_index + 2, bufferedLowUpper)
+
+// Middle line based on the selected timeframe
+var line middleLine = na
+var label middleLineLabel = na
+
+// Calculate middle line price for the selected timeframe
+prevCandleHighMiddle = request.security(syminfo.tickerid, timeFrame, high[1])
+prevCandleLowMiddle = request.security(syminfo.tickerid, timeFrame, low[1])
+
+// Middle line starts from the previous candle and goes 2 bars to the right
+if middleLineEnabled
+    middlePrice = (prevCandleHighMiddle + prevCandleLowMiddle) / 2
+    if na(middleLine)
+        middleLine := line.new(x1=bar_index[1], y1=middlePrice, x2=bar_index + 2, y2=middlePrice, color=middleLineColor, width=1, style=line.style_solid)
+
+    // Update the middle line position
+    line.set_xy1(middleLine, bar_index[1], middlePrice)
+    line.set_xy2(middleLine, bar_index + 2, middlePrice)
+
+    // Draw label indicating the timeframe, only if not "Chart"
+    if na(middleLineLabel)
+        labelText = middleLineTimeFrame != "Chart" ? middleLineTimeFrame : ""
+        middleLineLabel := label.new(x=bar_index + 2, y=middlePrice, text=labelText, color=color.new(middleLineColor, 100), textcolor=middleLineColor, style=label.style_label_left, size=size.small, textalign=text.align_left)
+    else
+        // Update label position and text
+        label.set_xy(middleLineLabel, bar_index + 2, middlePrice)
+        label.set_text(middleLineLabel, middleLineTimeFrame != "Chart" ? middleLineTimeFrame : "")
+
+// Check if the current candle touches or trades through the buffered high or low without breaking through
+touchedBufferedHigh = (high >= bufferedHighLower) and (high < bufferedHighUpper)
+touchedBufferedLow = (low <= bufferedLowUpper) and (low > bufferedLowLower)
+
+// Create an alert condition for the current candle touching or trading through the buffer zone
+alertcondition(touchedBufferedHigh or touchedBufferedLow, title="Price Buffer", message="Current candle touched the buffer zone of the previous candle!")
