@@ -1,4 +1,4 @@
-//@version=5
+//@version=6
 indicator("Tuspe Special Mix", shorttitle="Tuspe", overlay=true, dynamic_requests=true)
 
 isClosed = barstate.isconfirmed
@@ -11,26 +11,33 @@ prevFullSize = prevHigh - prevLow
 //  Moving Averages
 // ----------
 
-maGroup = "Simple Moving Averages"
+maGroup = "Moving Averages"
+ma1_length = input.int(9, title="MA1 Length", minval=1, group=maGroup)
+ma1_type = input.string("SMA", title="MA1 Type", options=["SMA", "EMA"], group=maGroup)
+ma2_length = input.int(20, title="MA2 Length", minval=1, group=maGroup)
+ma2_type = input.string("SMA", title="MA2 Type", options=["SMA", "EMA"], group=maGroup)
+ma3_length = input.int(200, title="MA3 Length", minval=1, group=maGroup)
+ma3_type = input.string("SMA", title="MA3 Type", options=["SMA", "EMA"], group=maGroup)
 
-// MA1 with fixed source as close
-len1Title = "MA1 Length"
-len1 = input.int(9, minval=5, title=len1Title, group=maGroup)
-plot(ta.sma(close, len1), title=len1Title, color=color.yellow, linewidth=2)
+// Moving average calculation function
+calculate_ma(ma_type, src, length) =>
+    ma_type == "SMA" ? ta.sma(src, length) : ta.ema(src, length)
 
-// MA2 with fixed source as close
-len2Title = "MA2 Length"
-len2 = input.int(50, minval=5, title=len2Title, group=maGroup)
-plot(ta.sma(close, len2), title=len2Title, color=color.orange, linewidth=2)
+// Calculate the moving averages
+ma1 = calculate_ma(ma1_type, close, ma1_length)
+ma2 = calculate_ma(ma2_type, close, ma2_length)
+ma3 = calculate_ma(ma3_type, close, ma3_length)
 
-// MA3 with fixed source as close
-len3Title = "MA3 Length"
-len3 = input.int(200, minval=5, title=len3Title, group=maGroup)
-out3 = ta.sma(close, len3)
-plot(out3, title=len3Title, color=close >= out3 ? color.green : color.red, linewidth=4)
+// Plot moving averages
+plot(ma1, color=color.orange, linewidth=1, title="MA1")
+plot(ma2, color=color.yellow, linewidth=2, title="MA2")
+plot(ma3, color=color.white, linewidth=3, title="MA3")
 
-// VWAP calculation
-plot(ta.vwap(close), title="VWAP", color=color.white, linewidth=3)
+// ----------
+//  Session VWAP
+// ----------
+
+plot(ta.vwap(close), title="Session VWAP", color=color.aqua, linewidth=3)
 
 // ----------
 //  Displacement
@@ -66,64 +73,3 @@ alertcondition(isInsideBar or isDisplaced, title="Elephant or Inside Bar", messa
 isOutsideBar = isClosed and not isDisplaced and not isInsideBar and fullSize > prevFullSize and prevHigh < high and prevLow > low
 barcolor(isOutsideBar ? color.fuchsia : na, title="Outside Bar")
 alertcondition(isOutsideBar, title="Outside Bar", message="New Outside Bar detected!")
-
-//------------------
-// Trend table
-//------------------
-
-// == USER INPUT ==
-tableLocation = input.string(defval='Bottom', options=['Top', 'Bottom'], title='Info Table Location', group='Display', tooltip='Place information table on the top of the pane or the bottom of the pane.')
-oneSet = input.timeframe(defval='15', title='First Timeframe', group='Higher Timeframe Levels')
-twoSet = input.timeframe(defval='60', title='Second Timeframe', group='Higher Timeframe Levels')
-threeSet = input.timeframe(defval='240', title='Third Timeframe', group='Higher Timeframe Levels')
-fourSet = input.timeframe(defval='D', title='Fourth Timeframe', group='Higher Timeframe Levels')
-
-// == TREND CALCULATIONS ==
-// Request high and low levels for each timeframe
-hL_01 = request.security(syminfo.tickerid, oneSet, high[1])
-lL_01 = request.security(syminfo.tickerid, oneSet, low[1])
-hL_02 = request.security(syminfo.tickerid, twoSet, high[1])
-lL_02 = request.security(syminfo.tickerid, twoSet, low[1])
-hL_03 = request.security(syminfo.tickerid, threeSet, high[1])
-lL_03 = request.security(syminfo.tickerid, threeSet, low[1])
-hL_04 = request.security(syminfo.tickerid, fourSet, high[1])
-lL_04 = request.security(syminfo.tickerid, fourSet, low[1])
-
-// Determine trend based on the close price relative to high and low levels
-uptrendSignal1 = close > hL_01
-downtrendSignal1 = close < lL_01
-uptrendSignal2 = close > hL_02
-downtrendSignal2 = close < lL_02
-uptrendSignal3 = close > hL_03
-downtrendSignal3 = close < lL_03
-uptrendSignal4 = close > hL_04
-downtrendSignal4 = close < lL_04
-
-// == TREND TABLE PLOTTING ==
-tablePos = tableLocation == 'Top' ? position.top_right : position.bottom_left
-var table trendTable = table.new(tablePos, 4, 1, border_width=3)
-upColor = color.rgb(38, 166, 154)
-downColor = color.rgb(240, 83, 80)
-yellowColor = color.new(color.yellow, 0)
-grayColor = color.new(#999999, 0)
-
-f_fillCell(_column, _row, _cellText, _c_color) =>
-    table.cell(trendTable, _column, _row, _cellText, bgcolor=color.new(_c_color, 70), text_color=_c_color, width=6)
-
-// Define glyphs and colors based on trends
-glyph1 = uptrendSignal1 ? '▲ ' : downtrendSignal1 ? '▼ ' : ''
-glyph2 = uptrendSignal2 ? '▲ ' : downtrendSignal2 ? '▼ ' : ''
-glyph3 = uptrendSignal3 ? '▲ ' : downtrendSignal3 ? '▼ ' : ''
-glyph4 = uptrendSignal4 ? '▲ ' : downtrendSignal4 ? '▼ ' : ''
-
-color1 = uptrendSignal1 ? upColor : downtrendSignal1 ? downColor : yellowColor
-color2 = uptrendSignal2 ? upColor : downtrendSignal2 ? downColor : yellowColor
-color3 = uptrendSignal3 ? upColor : downtrendSignal3 ? downColor : yellowColor
-color4 = uptrendSignal4 ? upColor : downtrendSignal4 ? downColor : yellowColor
-
-// Update table cells on the last bar
-if barstate.islast
-    f_fillCell(0, 0, glyph1 + oneSet, color1)
-    f_fillCell(1, 0, glyph2 + twoSet, color2)
-    f_fillCell(2, 0, glyph3 + threeSet, color3)
-    f_fillCell(3, 0, glyph4 + fourSet, color4)
