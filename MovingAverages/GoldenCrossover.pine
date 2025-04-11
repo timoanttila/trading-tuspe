@@ -1,0 +1,43 @@
+//@version=6
+indicator("Golden Crossover Signals [Tuspe]", shorttitle="Cross", overlay=true)
+
+shortLen = input.int(13, title="Short EMA Length", minval=5)
+medLen   = input.int(48, title="Medium EMA Length", minval=10)
+longLen  = input.int(200, title="Long EMA Length", minval=50)
+
+shortEMA = ta.ema(close, shortLen)
+medEMA   = ta.ema(close, medLen)
+longEMA  = ta.ema(close, longLen)
+
+plot(shortEMA, title="Short EMA", color=color.green, linewidth=1)
+plot(medEMA, title="Medium EMA", color=color.yellow, linewidth=1)
+plot(longEMA, title="Long EMA", color=color.white, linewidth=2)
+
+bullCross1 = (ta.crossover(shortEMA, medEMA) and medEMA > longEMA)
+bullCross2 = (ta.crossover(shortEMA, longEMA) and shortEMA > medEMA)
+bearCross1 = ta.crossunder(shortEMA, medEMA) and medEMA < longEMA
+bearCross2 = ta.crossunder(shortEMA, longEMA) and shortEMA < medEMA
+
+plotshape(series=bullCross1, title="Bullish Medium", location=location.belowbar, style=shape.triangleup, color=color.white, size=size.tiny)
+plotshape(series=bearCross1, title="Bearish Medium", location=location.abovebar, style=shape.triangledown, color=color.white, size=size.tiny)
+plotshape(series=bullCross2, title="Bullish Long", location=location.belowbar, style=shape.diamond, color=color.white, size=size.small)
+plotshape(series=bearCross2, title="Bearish Long", location=location.abovebar, style=shape.diamond, color=color.white, size=size.small)
+
+alertcondition(bullCross1 or bullCross2 or bearCross1 or bearCross2, title="Golden Crossover", message="New Golden Crossover signal detected! Happy trading.")
+
+// ----------
+//  Displacement
+// ----------
+
+rangeType = input.string("Open to Close", "Range Type", options = ['Open to Close', 'High to Low'], group="Displacement")
+devPeriod = input.int(100, minval = 1, title = "Deviation Period", group="Displacement")
+devMultiplier = input.int(3, minval = 0, title = "Deviation Multiplier", group="Displacement")
+
+priceRange = rangeType == "Open to Close" ? math.abs(open - close) : high - low
+rangeDeviation = ta.stdev(priceRange, devPeriod) * devMultiplier
+
+priceGap = close[1] > open[1] ? high[2] < low[0] : low[2] > high[0]
+isDisplaced = priceRange[1] > rangeDeviation[1] and priceGap
+
+barcolor(isDisplaced ? color.maroon : na, offset = -1, title="Displacement Highlight Color")
+alertcondition(isDisplaced, title="Elephant Bar", message="New Displacement / Elephant Bar detected!")
