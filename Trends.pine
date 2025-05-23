@@ -1,0 +1,236 @@
+//@version=5
+indicator("Multi-Timeframe Trend Indicator", shorttitle="Trends", overlay=true)
+
+// ----------
+//  Added option to select moving average type
+// ----------
+
+maType = input.string(title="Moving Average Type", defval="SMA", options=["SMA", "EMA", "WMA", "AMA"])
+
+// ----------
+//  Table position input
+// ----------
+
+tablePosition = input.string(title="Table Position", defval="bottom_left", options=["top_left", "top_right", "middle_left", "middle_right", "bottom_left", "bottom_right"])
+
+// ----------
+//  Choice for timeframe to display
+// ----------
+
+showTf2 = input(false, title="Show 2min")
+showTf4 = input(false, title="Show 5min")
+showTf6 = input(true, title="Show 15min")
+showTf8 = input(true, title="Show 1H")
+showTf10 = input(true, title="Show 4H")
+showTf13 = input(true, title="Show 1 Day")
+showTf14 = input(true, title="Show 1 week")
+showTf15 = input(true, title="Show AVG")
+
+// ----------
+//  Function to convert user input to position type
+// ----------
+
+get_position(value) =>
+    pos = position.middle_right
+    if value == "top_left"
+        pos := position.top_left
+    else if value == "top_right"
+        pos := position.top_right
+    else if value == "middle_left"
+        pos := position.middle_left
+    else if value == "middle_right"
+        pos := position.middle_right
+    else if value == "bottom_left"
+        pos := position.bottom_left
+    else if value == "bottom_right"
+        pos := position.bottom_right
+    pos
+
+// ----------
+//  Input for timeframes
+// ----------
+
+tf2= "2"
+tf4 = "5"
+tf6 = "15"
+tf7 = "30"
+tf8 = "60"
+tf10 = "240"
+tf13 = "1440"
+tf14 = "1W"
+
+// ----------
+//  Input for EMA lengths
+// ----------
+
+shortTerm = input(50, title="Short Term EMA Length")
+longTerm = input(200, title="Long Term EMA Length")
+
+// ----------
+//  Function to calculate the moving average according to the user's choice
+// ----------
+
+calcMa(price, length) =>
+    float ma = na
+    if maType == "SMA"
+        ma := ta.sma(price, length)
+    else if maType == "EMA"
+        ma := ta.ema(price, length)
+    else if maType == "WMA"
+        ma := ta.wma(price, length)
+    else if maType == "AMA"
+        ma := ta.hma(price, length)
+    ma
+
+// ----------
+//  Modify the EMA calculation part to use calcMa instead
+// ----------
+
+trendCalc(timeframe) =>
+    float maShort = request.security(syminfo.tickerid, timeframe, calcMa(close, shortTerm))
+    float maLong = request.security(syminfo.tickerid, timeframe, calcMa(close, longTerm))
+    trend = maShort > maLong ? 1 : -1
+    trend
+
+// Initial declarations to avoid errors due to undeclared identifiers
+float trend2 = na
+float trend4 = na
+float trend6 = na
+float trend8 = na
+float trend10 = na
+float trend13 = na
+float trend14 = na
+
+// ----------
+//  Initialize trendSum and activeTfs and Calculate trends for each timeframe
+// ----------
+
+trendSum = 0.0
+activeTfs = 0
+if showTf2
+    trend2 := trendCalc(tf2)
+    trendSum := trendSum + trend2
+    activeTfs := activeTfs + 1
+
+if showTf4
+    trend4 := trendCalc(tf4)
+    trendSum := trendSum + trend4
+    activeTfs := activeTfs + 1
+
+if showTf6
+    trend6 := trendCalc(tf6)
+    trendSum := trendSum + trend6
+    activeTfs := activeTfs + 1
+
+if showTf8
+    trend8 := trendCalc(tf8)
+    trendSum := trendSum + trend8
+    activeTfs := activeTfs + 1
+
+if showTf10
+    trend10 := trendCalc(tf10)
+    trendSum := trendSum + trend10
+    activeTfs := activeTfs + 1
+
+if showTf13
+    trend13 := trendCalc(tf13)
+    trendSum := trendSum + trend13
+    activeTfs := activeTfs + 1
+
+if showTf14
+    trend14 := trendCalc(tf14)
+    trendSum := trendSum + trend14
+    activeTfs := activeTfs + 1
+
+// ----------
+//  Calculate average trend if activeTfs is not zero to avoid division by zero
+// ----------
+
+trendAvg = activeTfs != 0 ? trendSum / activeTfs : na
+
+colorStrongDown = input.color(color.rgb(172, 1, 1), title='colorStrongDown', group='color')
+colorDown = input.color(color.red, title='colorDown', group='color')
+colorStrongUp = input.color(color.rgb(1, 128, 5), title='colorStrongUp', group='color')
+colorUp = input.color(color.green, title='colorUp', group='color')
+
+trendAvgText = ""
+trendAvgBgcolor = color.silver
+if trendAvg <= -0.8
+    trendAvgText := "Strong Down"
+    trendAvgBgcolor := colorStrongDown
+else if trendAvg <= -0.2
+    trendAvgText := "Down"
+    trendAvgBgcolor := colorDown
+else if trendAvg >= 0.8
+    trendAvgText := "Strong Up"
+    trendAvgBgcolor := colorStrongUp
+else if trendAvg >= 0.2
+    trendAvgText := "Up"
+    trendAvgBgcolor := colorUp
+else
+    trendAvgText := "Neutral"
+    trendAvgBgcolor := color.rgb(170, 169, 169)
+
+trendTable = table.new(position=get_position(tablePosition), columns=2, rows=16, frame_color=color.white, bgcolor=color.black)
+
+// ----------
+//  Add header cell with left alignment
+// ----------
+
+table.cell(trendTable, column=0, row=0, text="Trend", bgcolor=color.black, text_color=color.white)
+table.cell(trendTable, column=1, row=0, text="TF", bgcolor=color.black, text_color=color.white)
+
+// ----------
+//  Fill table cells
+// ----------
+
+if showTf2
+    table.cell(trendTable, column=1, row=2, text="2", bgcolor=color.rgb(0, 0, 0, 70), text_color=color.white)
+    table.cell(trendTable, column=0, row=2, text=(trend2 > 0 ? "Up" : "Down"), bgcolor=trend2 > 0 ? colorUp : colorDown)
+
+if showTf4
+    table.cell(trendTable, column=1, row=4, text="5", bgcolor=color.rgb(0, 0, 0, 70), text_color=color.white)
+    table.cell(trendTable, column=0, row=4, text=(trend4 > 0 ? "Up" : "Down"), bgcolor=trend4 > 0 ? colorUp : colorDown)
+
+if showTf6
+    table.cell(trendTable, column=1, row=6, text="15", bgcolor=color.rgb(0, 0, 0, 70), text_color=color.white)
+    table.cell(trendTable, column=0, row=6, text=(trend6 > 0 ? "Up" : "Down"), bgcolor=trend6 > 0 ? colorUp : colorDown)
+
+if showTf8
+    table.cell(trendTable, column=1, row=8, text="1H", bgcolor=color.rgb(0, 0, 0, 70), text_color=color.white)
+    table.cell(trendTable, column=0, row=8, text=(trend8 > 0 ? "Up" : "Down"), bgcolor=trend8 > 0 ? colorUp : colorDown)
+
+if showTf10
+    table.cell(trendTable, column=1, row=10, text="4H", bgcolor=color.rgb(0, 0, 0, 70), text_color=color.white)
+    table.cell(trendTable, column=0, row=10, text=(trend10 > 0 ? "Up" : "Down"), bgcolor=trend10 > 0 ? colorUp: colorDown)
+
+if showTf13
+    table.cell(trendTable, column=1, row=13, text="1D", bgcolor=color.rgb(0, 0, 0, 70), text_color=color.white)
+    table.cell(trendTable, column=0, row=13, text=(trend13 > 0 ? "Up" : "Down"), bgcolor=trend13 > 0 ? colorUp : colorDown)
+
+if showTf14
+    table.cell(trendTable, column=1, row=14, text="1W", bgcolor=color.rgb(0, 0, 0, 70), text_color=color.white)
+    table.cell(trendTable, column=0, row=14, text=(trend14 > 0 ? "Up" : "Down"), bgcolor=trend14 > 0 ? colorUp : colorDown)
+
+if showTf15
+    table.cell(trendTable, column=1, row=15, text="AVG", bgcolor=color.rgb(0, 0, 0, 70), text_color=color.white)
+    table.cell(trendTable, column=0, row=15, text=(trendAvgText), bgcolor=trendAvgBgcolor)
+
+// ----------
+//  Use calcMa to calculate short- and long-term moving averages
+// ----------
+
+maShort = calcMa(close, shortTerm)
+maLong = calcMa(close, longTerm)
+
+// ----------
+//  Defining alerts conditions based on trendAvg
+// ----------
+
+alertcondition(trendAvg <= -0.8, title="Strong Down Alert", message="The average trend is Strong Down.")
+alertcondition(trendAvg <= -0.2 and trendAvg > -0.8, title="Down Alert", message="The average trend is Down.")
+alertcondition(trendAvg > -0.2 and trendAvg < 0.2, title="Neutral Alert", message="The average trend is Neutral.")
+alertcondition(trendAvg >= 0.2 and trendAvg < 0.8, title="Up Alert", message="The average trend is Up.")
+alertcondition(trendAvg >= 0.8, title="Strong Up Alert", message="The average trend is Strong Up.")
+alertcondition(trendAvg >= 0.2 or trendAvg <= -0.2, title="Strong Up Alert", message="The average trend is shifting.")
+alertcondition(trendAvg >= 0.8 or trendAvg <= -0.8, title="Strong Up Alert", message="The average trend is Strong.")

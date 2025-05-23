@@ -1,0 +1,63 @@
+//------------------
+// Previous day high/low
+//------------------
+
+showPdhl = input(true, "Show previous day high and low", group = "Daily Highs & Lows")
+
+hl() => [high, low]
+
+phl(h, l, tf, css)=>
+    var line highLine = line.new(na, na, na, na, xloc = xloc.bar_time, color = css, style = line.style_solid)
+    var label highLbl = label.new(na, na, xloc = xloc.bar_time, text = str.format('P{0}H', tf), color = color.new(color.white, 100), textcolor = css, size = size.small, style = label.style_label_left)
+    var line lowLine = line.new(na, na, na, na, xloc = xloc.bar_time, color = css, style = line.style_solid)
+    var label lowLbl = label.new(na, na, xloc = xloc.bar_time, text = str.format('P{0}L', tf), color = color.new(color.white, 100), textcolor = css, size = size.small, style = label.style_label_left)
+
+    hy = ta.valuewhen(h != h[1], h, 1)
+    hx = ta.valuewhen(h == high, time, 1)
+
+    ly = ta.valuewhen(l != l[1], l, 1)
+    lx = ta.valuewhen(l == low, time, 1)
+
+    if barstate.islast
+        ext = time + (time - time[1]) * 2
+
+        // High
+        line.set_xy1(highLine, hx, hy)
+        line.set_xy2(highLine, ext, hy)
+        label.set_xy(highLbl, ext, hy)
+
+        // Low
+        line.set_xy1(lowLine, lx, ly)
+        line.set_xy2(lowLine, ext, ly)
+        label.set_xy(lowLbl, ext, ly)
+
+[pdh, pdl] = request.security(syminfo.tickerid, 'D', hl(), lookahead = barmerge.lookahead_on)
+pdhl_css = input.color(color.new(color.green, 40), "Previous Day Line Color", group = "Highs & Lows")
+
+// Fetch high and low for the previous day
+var float prevDayHigh = na
+var float prevDayLow = na
+
+if (dayofweek(time) != dayofweek(time[1]))
+    prevDayHigh := pdh
+    prevDayLow := pdl
+
+// Display Daily
+if showPdhl
+    phl(prevDayHigh, prevDayLow, 'D', pdhl_css)
+
+// Input for user-defined zone in cents
+zoneWidthCents = input(50, title="Zone width (in cents)", group="Highs & Lows") / 100
+
+// Calculate zones based on PDH and PDL
+pdhZoneHigh = prevDayHigh - zoneWidthCents
+pdlZoneLow = prevDayLow + zoneWidthCents
+
+// Check if the close or wick is within the PDH or PDL zone, or crosses over PDH or under PDL
+inPdhZone = high >= prevDayHigh or high > pdhZoneHigh
+inPdlZone = low <= prevDayLow and low <= pdlZoneLow
+
+// Alerts for PDH and PDL zones and wick crossing above or below
+alertcondition(inPdhZone, title="Previous day high", message="Price is near or above the previous day high (PDH)")
+alertcondition(inPdlZone, title="Previous day low", message="Price is near or below the previous day low (PDL)")
+alertcondition(inPdhZone or inPdlZone, title="Previous day", message="Price is near the previous day high or low.")

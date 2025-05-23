@@ -1,0 +1,105 @@
+//@version=6
+indicator("Moving Average Pullback Strategy", shorttitle="EMAPB", overlay=true, dynamic_requests=true)
+
+// ----------
+//  Moving Averages
+// ----------
+
+ma1_length = input.int(9, title="MA1 Length", minval=1)
+ma1_type = input.string("EMA", title="MA1 Type", options=["SMA", "EMA"])
+ma2_length = input.int(20, title="MA2 Length", minval=1)
+ma2_type = input.string("SMA", title="MA2 Type", options=["SMA", "EMA"])
+
+// Moving average calculation function
+calculate_ma(ma_type, src, length) =>
+    ma_type == "SMA" ? ta.sma(src, length) : ta.ema(src, length)
+
+// Calculate the moving averages
+ma1 = calculate_ma(ma1_type, close, ma1_length)
+ma2 = calculate_ma(ma2_type, close, ma2_length)
+
+// Plot moving averages
+plot(ma1, color=color.orange, linewidth=1, title="MA1")
+plot(ma2, color=color.yellow, linewidth=2, title="MA2")
+
+// ----------
+// Pullback Strategy Logic
+// ----------
+
+var bool bullishCross = false
+var bool bearishCross = false
+var bool pullbackMarked = false
+var bool executionMarked = false
+
+// Variables to store the high/low of the pullback candle
+var float pullbackValue = na
+
+// Reset states if price closes against MA2 (i.e., trend invalidation)
+if ta.cross(ma1, ma2)
+    bullishCross := false
+    bearishCross := false
+    executionMarked := false
+    pullbackMarked := false
+    pullbackValue := na // Reset pullback high/low on trend
+    if ma1 > ma2
+        bullishCross := true
+    else if ma2 > ma1
+        bearishCross := true
+
+bool bullishPullback = false
+if bullishCross and not pullbackMarked and open > close
+    bullishPullback := true
+    pullbackValue := high
+
+bool bearishPullback = false
+if bearishCross and not pullbackMarked and close > open
+    bearishPullback := true
+    pullbackValue := low
+
+// Pullback is confirmed
+if bullishPullback or bearishPullback
+    pullbackMarked := true
+
+// Volume check
+bool volumeConfirm = (volume > ta.ema(volume, volumeMALength)) // Volume must be above its MA
+
+// Body must be at least 50% of the total candle range
+// This implies it's not a doji and the body is substantial.
+bool candleShapeConfirm = math.abs(close - open) > (math.abs(high - low) * 0.4)
+
+bool bearishExecution = false
+bool bullishExecution = false
+if pullbackMarked and not executionMarked and volumeConfirm and candleShapeConfirm
+    // Execution Signal (Bullish) - Triangle logic
+    if bullishCross and close > open and close > pullbackValue
+        bullishExecution := true
+        executionMarked := true
+    // Execution Signal (Bearish) - Triangle logic
+    if bearishCross and open > close and pullbackValue > close
+        bearishExecution := true
+        executionMarked := true
+
+// Plotting the signals
+plotshape(bullishPullback, style=shape.cross, location=location.belowbar, color=color.white, size=size.tiny, title="Bullish Pullback")
+plotshape(bearishPullback, style=shape.cross, location=location.abovebar, color=color.white, size=size.tiny, title="Bearish Pullback")
+plotshape(bullishExecution, style=shape.triangleup, location=location.belowbar, color=color.white, size=size.tiny, title="Bullish Execution")
+plotshape(bearishExecution, style=shape.triangledown, location=location.abovebar, color=color.white, size=size.tiny, title="Bearish Execution")
+
+// ----------
+//  Engulfing
+// ----------
+
+isEngulfingSize = math.abs(open - close) > math.abs(high[1] - low[1]) * 2
+plotshape(series=isEngulfingSize and close > open and close > ma2 and open[1] > close[1], title="Golden Engulfing", location=location.belowbar, style=shape.circle, color=color.white, size=size.tiny)
+plotshape(series=isEngulfingSize and open > close and ma2 > close and close[1] > open[1], title="Death Engulfing", location=location.abovebar, style=shape.circle, color=color.white, size=size.tiny)
+
+// ----------
+//  Alerts
+// ----------
+
+alertcondition(bullishExecution or bearishExecution, title="Continuation", message="Price has return over moving average and pullback is most likely over. Good luck and happy trading!")
+alertcondition(bullishExecution, title="Bullish Continuation", message="Possible bullish continuation after the pullback. Good luck and happy trading!")
+alertcondition(bearishExecution, title="Bearish Continuation", message="Possible bearish continuation after the pullback. Good luck and happy trading!")
+
+// Pullback
+alertcondition(bullishPullback or bearishPullback, title="Pullback", message="In a bullish trend, place a limit or stop order above the candle; in a bearish trend, place it below. Good luck and happy trading!")
