@@ -1,0 +1,136 @@
+//@version=6
+indicator("Tuspe Special Mix", shorttitle="Tuspe", overlay=true, dynamic_requests=true)
+
+prevHigh = high[1]
+prevLow = low[1]
+prevFullSize = math.abs(prevHigh - prevLow)
+
+// ----------
+//  Moving Averages
+// ----------
+
+maGroup = "Moving Averages"
+ma1_length = input.int(9, title="MA1 Length", minval=1, group=maGroup)
+ma1_type = input.string("EMA", title="MA1 Type", options=["SMA", "EMA"], group=maGroup)
+ma2_length = input.int(20, title="MA2 Length", minval=1, group=maGroup)
+ma2_type = input.string("SMA", title="MA2 Type", options=["SMA", "EMA"], group=maGroup)
+ma3_length = input.int(200, title="MA3 Length", minval=1, group=maGroup)
+ma3_type = input.string("SMA", title="MA3 Type", options=["SMA", "EMA"], group=maGroup)
+
+// Moving average calculation function
+calculate_ma(ma_type, src, length) =>
+    ma_type == "SMA" ? ta.sma(src, length) : ta.ema(src, length)
+
+// Calculate the moving averages
+ma1 = calculate_ma(ma1_type, close, ma1_length)
+ma2 = calculate_ma(ma2_type, close, ma2_length)
+ma3 = calculate_ma(ma3_type, close, ma3_length)
+
+// Plot moving averages
+plot(ma1, color=color.orange, linewidth=1, title="MA1")
+plot(ma2, color=color.yellow, linewidth=2, title="MA2")
+plot(ma3, color=color.white, linewidth=2, title="MA3")
+
+// ----------
+//  Displacement
+// ----------
+
+// Displacement Indicator Logic
+rangeType = input.string("Open to Close", "Range Type", options = ['Open to Close', 'High to Low'], group="Displacement")
+devPeriod = input.int(100, minval = 1, title = "Deviation Period", group="Displacement")
+devMultiplier = input.int(3, minval = 0, title = "Deviation Multiplier", group="Displacement")
+
+priceRange = rangeType == "Open to Close" ? math.abs(open - close) : high - low
+rangeDeviation = ta.stdev(priceRange, devPeriod) * devMultiplier
+
+priceGap = close[1] > open[1] ? high[2] < low[0] : low[2] > high[0]
+isDisplaced = priceRange[1] > rangeDeviation[1] and priceGap
+
+barcolor(isDisplaced ? color.maroon : na, offset = -1, title="Displacement Highlight Color")
+
+// ----------
+//  Inside Bar
+// ----------
+
+isInsideBar = barstate.isconfirmed and not isDisplaced and high - low < prevFullSize and prevHigh > high and prevLow < low
+barcolor(isInsideBar ? color.yellow : na, title="Inside Bar")
+
+// ----------
+//  Session VWAP
+// ----------
+
+// Timeframe Check
+lowerTimeframe = timeframe.isintraday and timeframe.multiplier <= 10
+
+// Plot VWAP only if the current timeframe is 15 minutes or less
+vwap = ta.vwap(close)
+plot(lowerTimeframe ? vwap : na, title="Session VWAP", color=color.aqua, linewidth=2)
+
+// ----------
+// Pullback Strategy Logic
+// ----------
+
+var bool bullishCross = false
+var bool bearishCross = false
+var bool pullbackMarked = false
+var bool executionMarked = false
+
+// Variables to store the high/low of the pullback candle
+var float pullbackValue = na
+
+// Reset states if price closes against MA2 (i.e., trend invalidation)
+if ta.cross(ma1, ma2)
+    bullishCross := false
+    bearishCross := false
+    executionMarked := false
+    pullbackMarked := false
+    pullbackValue := na // Reset pullback high/low on trend
+    if close > ma1
+        bullishCross := true
+    else if ma1 > close
+        bearishCross := true
+
+bool bullishPullback = false
+if bullishCross and not pullbackMarked and open > close
+    bullishPullback := true
+    pullbackValue := high
+
+bool bearishPullback = false
+if bearishCross and not pullbackMarked and close > open
+    bearishPullback := true
+    pullbackValue := low
+
+// Pullback is confirmed
+if bullishPullback or bearishPullback
+    pullbackMarked := true
+
+bool bearishExecution = false
+bool bullishExecution = false
+if pullbackMarked and not executionMarked
+    if bullishCross and close > open and close > pullbackValue
+        bullishExecution := true
+        executionMarked := true
+    if bearishCross and open > close and pullbackValue > close
+        bearishExecution := true
+        executionMarked := true
+
+// Plotting the signals
+plotshape(bullishPullback, style=shape.cross, location=location.belowbar, color=color.white, size=size.tiny, title="Bullish Pullback")
+plotshape(bearishPullback, style=shape.cross, location=location.abovebar, color=color.white, size=size.tiny, title="Bearish Pullback")
+plotshape(bullishExecution, style=shape.triangleup, location=location.belowbar, color=color.white, size=size.tiny, title="Bullish Execution")
+plotshape(bearishExecution, style=shape.triangledown, location=location.abovebar, color=color.white, size=size.tiny, title="Bearish Execution")
+
+// ----------
+//  Alerts
+// ----------
+
+alertcondition(bullishExecution or bearishExecution, title="Continuation", message="Price has return over moving average and pullback is most likely over. Good luck and happy trading!")
+alertcondition(bullishExecution, title="Bullish Continuation", message="Possible bullish continuation after the pullback. Good luck and happy trading!")
+alertcondition(bearishExecution, title="Bearish Continuation", message="Possible bearish continuation after the pullback. Good luck and happy trading!")
+
+// Pullback
+alertcondition(bullishPullback or bearishPullback, title="Pullback", message="In a bullish trend, place a limit or stop order above the candle; in a bearish trend, place it below. Good luck and happy trading!")
+
+// Candle patterns
+alertcondition(isDisplaced, title="Elephant Bar", message="New Displacement / Elephant Bar detected!")
+alertcondition(isInsideBar, title="Inside Bar", message="New Inside Bar detected!")

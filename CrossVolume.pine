@@ -1,0 +1,133 @@
+//@version=6
+indicator("Tuspe Special Mix", shorttitle="Tuspe", overlay=true, dynamic_requests=true)
+
+// ----------
+//  Moving Averages
+// ----------
+
+maGroup = "Moving Averages"
+ma1_length = input.int(9, title="MA1 Length", minval=5, group=maGroup)
+ma1_type = input.string("EMA", title="MA1 Type", options=["SMA", "EMA"], group=maGroup)
+ma2_length = input.int(21, title="MA2 Length", minval=10, group=maGroup)
+ma2_type = input.string("EMA", title="MA2 Type", options=["SMA", "EMA"], group=maGroup)
+ma3_length = input.int(50, title="MA3 Length", minval=20, group=maGroup)
+ma3_type = input.string("SMA", title="MA3 Type", options=["SMA", "EMA"], group=maGroup)
+ma4_length = input.int(200, title="MA4 Length", minval=50, group=maGroup)
+ma4_type = input.string("SMA", title="MA4 Type", options=["SMA", "EMA"], group=maGroup)
+
+// Moving average calculation function
+calculate_ma(ma_type, src, length) =>
+    ma_type == "SMA" ? ta.sma(src, length) : ta.ema(src, length)
+
+// Calculate the moving averages
+ma1 = calculate_ma(ma1_type, close, ma1_length)
+ma2 = calculate_ma(ma2_type, close, ma2_length)
+ma3 = calculate_ma(ma3_type, close, ma3_length)
+ma4 = calculate_ma(ma4_type, close, ma4_length)
+
+// Plot moving averages
+plot(ma1, color=color.aqua, linewidth=2, title="MA1")
+plot(ma2, color=color.yellow, linewidth=1, title="MA2")
+plot(ma3, color=color.orange, linewidth=1, title="MA3")
+plot(ma4, color=color.white, linewidth=3, title="MA4")
+
+// ----------
+//  Displacement
+// ----------
+
+// Displacement Indicator Logic
+rangeType = input.string("Open to Close", "Range Type", options = ['Open to Close', 'High to Low'], group="Displacement")
+devPeriod = input.int(100, minval = 1, title = "Deviation Period", group="Displacement")
+devMultiplier = input.int(3, minval = 0, title = "Deviation Multiplier", group="Displacement")
+
+priceRange = rangeType == "Open to Close" ? math.abs(open - close) : high - low
+rangeDeviation = ta.stdev(priceRange, devPeriod) * devMultiplier
+
+priceGap = close[1] > open[1] ? high[2] < low[0] : low[2] > high[0]
+isDisplaced = priceRange[1] > rangeDeviation[1] and priceGap
+
+barcolor(isDisplaced ? color.maroon : na, offset = -1, title="Displacement Highlight Color")
+
+// ----------
+//  Inside Bar
+// ----------
+
+prevHigh = high[1]
+prevLow = low[1]
+
+isInsideBar = barstate.isconfirmed and not isDisplaced and high - low < math.abs(prevHigh - prevLow) and prevHigh > high and prevLow < low
+barcolor(isInsideBar ? color.yellow : na, title="Inside Bar")
+
+// ----------
+//  Session VWAP
+// ----------
+
+lowerTimeframe = timeframe.isintraday and timeframe.multiplier <= 15
+
+// Plot VWAP only if the current timeframe is 15 minutes or less
+vwap = ta.vwap(close)
+plot(lowerTimeframe ? vwap : na, title="Session VWAP", color=color.teal, linewidth=3)
+
+// ----------
+//  Golden / Death Crossover
+// ----------
+
+// Volume MA Input
+volMaLen = input.int(14, "Volume MA Length", group="Volume")
+volMa = ta.sma(volume, volMaLen)
+
+// Cross detection
+maBullCross = ta.crossover(ma1, ma2)
+maBearCross = ta.crossunder(ma1, ma2)
+
+// State vars
+var string currentTrend = ""
+var bool signalMarked = false
+var bool isStrongSignal = false
+var float crossCandleClose = na
+
+// Reset states on new crossover
+if maBullCross
+    currentTrend := "bull"
+    signalMarked := false
+    crossCandleClose := close
+else if maBearCross
+    currentTrend := "bear"
+    signalMarked := false
+    crossCandleClose := close
+
+// Signal detection and marking
+plotBullishShape = false
+plotBearishShape = false
+plotShapeSize = size.tiny
+
+if not signalMarked and volume > volMa
+    isStrongSignal := volume > volume[1]
+
+    // Bullish signal
+    if currentTrend == "bull" and close > ma1 and close > open and close > crossCandleClose
+        plotBullishShape := true
+        signalMarked := true
+
+    // Bearish signal
+    else if currentTrend == "bear" and close < ma1 and close < open and close < crossCandleClose
+        plotBearishShape := true
+        signalMarked := true
+
+// Plot
+plotshape(plotBullishShape and isStrongSignal, location=location.belowbar, style=shape.triangleup, size=size.small, color=color.green, title="Bullish Signal Small")
+plotshape(plotBullishShape and not isStrongSignal, location=location.belowbar, style=shape.triangleup, size=size.tiny, color=color.green, title="Bullish Signal Tiny")
+plotshape(plotBearishShape and isStrongSignal, location=location.abovebar, style=shape.triangledown, size=size.small, color=color.red, title="Bearish Signal Small")
+plotshape(plotBearishShape and not isStrongSignal, location=location.abovebar, style=shape.triangledown, size=size.tiny, color=color.red, title="Bearish Signal Tiny")
+
+// ----------
+//  Alerts
+// ----------
+
+alertcondition(plotBullishShape or plotBearishShape, title="Crossover", message="Golden or Death crossover with strong volume. Good luck and happy trading!")
+alertcondition(plotBullishShape, title="Golden Crossover", message="Golden crossover with strong volume. Good luck and happy trading!")
+alertcondition(plotBearishShape, title="Death Crossover", message="Death crossover with strong volume. Good luck and happy trading!")
+
+// Candle patterns
+alertcondition(isDisplaced, title="Elephant Bar", message="New Displacement / Elephant Bar detected!")
+alertcondition(isInsideBar, title="Inside Bar", message="New Inside Bar detected!")
