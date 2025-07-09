@@ -1,0 +1,271 @@
+//@version=6
+indicator("The Turtle Strategy", shorttitle="Turtle", overlay=true)
+
+// ----------
+//  System 1 Configuration
+// ----------
+
+group1 = "System 1 Settings"
+var bool sys1_enabled = input.bool(true, title="Enable System 1", group=group1)
+ma1_length = input.int(20, title="Entry MA Length", minval=10, group=group1)
+ma1_type = input.string("SMA", title="Entry MA Type", options=["SMA", "EMA"], group=group1)
+ma2_length = input.int(10, title="Exit MA Length", minval=10, group=group1)
+ma2_type = input.string("SMA", title="Exit MA Type", options=["SMA", "EMA"], group=group1)
+
+var int cross1 = 0
+var int entry1 = 0
+var int exit1 = 0
+
+// ----------
+//  System 2 Configuration
+// ----------
+
+group2 = "System 2 Settings"
+var bool sys2_enabled = input.bool(false, title="Enable System 2", group=group2)
+ma3_length = input.int(55, title="Entry MA Length", minval=20, group=group2)
+ma3_type = input.string("SMA", title="Entry MA Type", options=["SMA", "EMA"], group=group2)
+ma4_length = input.int(20, title="Exit MA Length", minval=20, group=group2)
+ma4_type = input.string("SMA", title="Exit MA Type", options=["SMA", "EMA"], group=group2)
+
+var int cross2 = 0
+var int entry2 = 0
+var int exit2 = 0
+
+// ----------
+//  Filters
+// ----------
+
+n_bars = input.int(defval=6, title="Number of Bars for High/Low", minval=1, group="Filters")
+
+// ----------
+//  Global variables and helpers
+// ----------
+
+var int exit = 0 // This variable is declared but not used, can be removed if not intended for future use.
+var bool system_enabled = sys1_enabled or sys2_enabled
+
+float highest = ta.highest(high, n_bars)[1]
+float lowest = ta.lowest(low, n_bars)[1]
+
+calculate_ma(ma_type, src, length) =>
+    ma_type == "SMA" ? ta.sma(src, length) : ta.ema(src, length)
+
+// ----------
+//  System 1
+// ----------
+
+float sys1_ma1 = na
+float sys1_ma2 = na
+if sys1_enabled
+    sys1_ma1 := calculate_ma(ma1_type, close, ma1_length)
+    sys1_ma2 := calculate_ma(ma2_type, close, ma2_length)
+
+    // Check for Entry MA crossover (clears everything and starts fresh)
+    bool sys1_cross = ta.crossover(close, sys1_ma1)
+    if sys1_cross
+        cross1 := 1  // Bulls
+        entry1 := 0
+        exit1 := 0
+
+    sys1_cross := ta.crossunder(close, sys1_ma1)
+    if sys1_cross
+        cross1 := 2  // Bears
+        entry1 := 0
+        exit1 := 0
+
+    // Exit logic - if we have an active entry and Exit MA is crossed
+    if entry1 == 2 // If an entry was active (confirmed)
+        // Check for crossunder for long exit
+        sys1_cross := ta.crossunder(close, sys1_ma2)
+        if sys1_cross and cross1 == 1 // If currently in a long position (cross1 == 1) and price crosses below exit MA
+            exit1 := cross1 // Corrected: Assign cross1 (1 for long exit) to exit1
+            entry1 := 0
+            // cross1 := 0 // Removed: Do not reset cross1 on exit to allow re-entry
+
+        // Check for crossover for short exit
+        sys1_cross := ta.crossover(close, sys1_ma2)
+        if sys1_cross and cross1 == 2 // If currently in a short position (cross1 == 2) and price crosses above exit MA
+            exit1 := cross1 // Corrected: Assign cross1 (2 for short exit) to exit1
+            entry1 := 0
+            // cross1 := 0 // Removed: Do not reset cross1 on exit to allow re-entry
+
+    // Entry logic - look for valid entry candle after Entry MA cross
+    if cross1 > 0 and entry1 == 0 // If a cross has occurred but no entry is active
+        bool sys1_valid = cross1 == 1 ? close >= highest : close <= lowest // Check filter condition
+        if sys1_valid
+            if cross1 == 1 and close > open and close > sys1_ma1 // Long entry conditions
+                entry1 := 1  // Mark for entry
+            else if cross1 == 2 and open > close and close < sys1_ma1 // Short entry conditions
+                entry1 := 1  // Mark for entry
+            if exit1 > 0 and entry1 == 1 // If an exit was pending and a new entry is marked, clear the exit
+                exit1 := 0
+
+// ----------
+//  System 2
+// ----------
+
+float sys2_ma1 = na
+float sys2_ma2 = na
+if sys2_enabled
+    sys2_ma1 := calculate_ma(ma3_type, close, ma3_length)
+    sys2_ma2 := calculate_ma(ma4_type, close, ma4_length)
+
+    // Check for Entry MA crossover (clears everything and starts fresh)
+    bool sys2_cross = ta.crossover(close, sys2_ma1)
+    if sys2_cross
+        cross2 := 1  // Bulls
+        entry2 := 0
+        exit2 := 0
+
+    sys2_cross := ta.crossunder(close, sys2_ma1)
+    if sys2_cross
+        cross2 := 2  // Bears
+        entry2 := 0
+        exit2 := 0
+
+    // Exit logic - if we have an active entry and exit MA is crossed
+    if entry2 == 2 // If an entry was active (confirmed)
+        // Check for crossunder for long exit
+        sys2_cross := ta.crossunder(close, sys2_ma2)
+        if cross2 == 1 and sys2_cross // If currently in a long position (cross2 == 1) and price crosses below exit MA
+            exit2 := cross2 // Correct: Assign cross2 (1 for long exit) to exit2
+            entry2 := 0
+            // cross2 := 0 // Removed: Do not reset cross2 on exit to allow re-entry
+
+        // Check for crossover for short exit
+        sys2_cross := ta.crossover(close, sys2_ma2)
+        if cross2 == 2 and sys2_cross // If currently in a short position (cross2 == 2) and price crosses above exit MA
+            exit2 := cross2 // Correct: Assign cross2 (2 for short exit) to exit2
+            entry2 := 0
+            // cross2 := 0 // Removed: Do not reset cross2 on exit to allow re-entry
+
+    // Entry logic - look for valid entry candle after Entry MA cross
+    if cross2 > 0 and entry2 == 0 // If a cross has occurred but no entry is active
+        bool sys2_valid = cross2 == 1 ? close >= highest : close <= lowest // Check filter condition
+        if sys2_valid
+            if cross2 == 1 and close > open and close > sys2_ma1 // Long entry conditions
+                entry2 := 1  // Mark for entry
+            else if cross2 == 2 and open > close and close < sys2_ma1 // Short entry conditions
+                entry2 := 1  // Mark for entry
+            if exit2 > 0 and entry2 == 1 // If an exit was pending and a new entry is marked, clear the exit
+                exit2 := 0
+
+// ----------
+//  Systems plots
+// ----------
+
+// System 1 Entry Plots
+plot(sys1_ma1, color=color.orange, linewidth=2, title="SYS1 Entry")
+plot(sys1_ma2, color=color.gray, linewidth=1, title="SYS1 Exit")
+plotshape(entry1 == 1 and cross1 == 1, title="SYS1 Long", style=shape.triangleup, location=location.belowbar, color=color.white, size=size.tiny)
+plotshape(entry1 == 1 and cross1 == 2, title="SYS1 Short", style=shape.triangledown, location=location.abovebar, color=color.white, size=size.tiny)
+
+// System 2 Entry Plots
+plot(sys2_ma1, color=color.yellow, linewidth=2, title="SYS2 Entry")
+plot(sys2_ma2, color=color.gray, linewidth=1, title="SYS2 Exit")
+plotshape(entry2 == 1 and cross2 == 1, title="SYS2 Long", style=shape.diamond, location=location.belowbar, color=color.white, size=size.tiny)
+plotshape(entry2 == 1 and cross2 == 2, title="SYS2 Short", style=shape.diamond, location=location.abovebar, color=color.white, size=size.tiny)
+
+// Exit Plots
+// These conditions will now correctly evaluate for System 1 exits as well
+plotshape(exit1 == 1 or exit2 == 1, title="Long Exit", style=shape.xcross, location=location.belowbar, color=color.white, size=size.tiny)
+plotshape(exit1 == 2 or exit2 == 2, title="Short Exit", style=shape.xcross, location=location.abovebar, color=color.white, size=size.tiny)
+
+// ----------
+//  Systems alerts
+// ----------
+
+alertcondition(entry1 == 1 or entry2 == 1, title="New Entry", message="New Entry on {{ticker}}")
+alertcondition(entry1 == 1 and cross1 > 0, title="SYS1: New Entry", message="SYS1: New Entry on {{ticker}}")
+alertcondition(entry1 == 1 and cross1 == 1, title="SYS1: New Long Entry", message="SYS1: New Long Entry on {{ticker}}")
+alertcondition(entry1 == 1 and cross1 == 2, title="SYS1: New Short Entry", message="SYS1: New Short Entry on {{ticker}}")
+alertcondition(entry2 == 1 and cross2 > 0, title="SYS2: New Entry", message="SYS2: New Entry on {{ticker}}")
+alertcondition(entry2 == 1 and cross2 == 1, title="SYS2: New Long Entry", message="SYS2: New Long Entry on {{ticker}}")
+alertcondition(entry2 == 1 and cross2 == 2, title="SYS2: New Short Entry", message="SYS2: New Short Entry on {{ticker}}")
+
+// ----------
+//  Update entry states after plotting
+// ----------
+
+// These lines ensure the entry state persists for one bar after the signal
+// so that the exit logic can correctly identify an "active entry".
+if entry1 == 1
+    entry1 := 2
+
+if entry2 == 1
+    entry2 := 2
+
+// Reset exit states after plotting
+if exit1 != 0
+    exit1 := 0
+
+if exit2 != 0
+    exit2 := 0
+
+// ----------
+//  Lot Size Calculator
+// ----------
+
+// User inputs
+group3 = "Risk Management"
+account_balance = input.float(10000, "Account Balance ($)", minval=1, group=group3)
+risk_percent = input.float(1.0, "Risk Per Trade (%)", minval=0.1, maxval=10, step=0.1, group=group3)
+atr_length = input.int(14, "ATR Length", minval=1, group=group3)
+show_table = input.bool(true, "Show Position Size Table", group=group3)
+
+// Calculate ATR (N value)
+atr_value = ta.atr(atr_length)
+
+// Calculate risk amount in dollars
+risk_amount = account_balance * (risk_percent / 100)
+
+// Get symbol information for point value calculation
+tick_size = syminfo.mintick
+tick_value = syminfo.pointvalue
+
+// Calculate dollar value per point
+// For most instruments, this is the tick value divided by tick size
+dollar_per_point = tick_value / tick_size
+
+// Handle special cases for different asset types
+// Note: These calculations are simplified. Real-world forex/crypto calculations
+// might require more complex logic involving quote currency conversion.
+if syminfo.type == "forex"
+    dollar_per_point := tick_value / tick_size
+else if syminfo.type == "crypto"
+    dollar_per_point := tick_value / tick_size
+else if syminfo.type == "stock"
+    dollar_per_point := tick_value / tick_size
+else if syminfo.type == "index" or syminfo.type == "cfd"
+    dollar_per_point := tick_value / tick_size
+else
+    dollar_per_point := tick_value / tick_size
+
+// Calculate unit size using the formula: Risk Amount / (N * Dollar Value per Point)
+// Where N = 1 ATR
+unit_size = atr_value > 0 and dollar_per_point > 0 ? risk_amount / (atr_value * dollar_per_point) : 0
+
+// Calculate maximum loss if ATR is hit
+max_loss = unit_size * atr_value * dollar_per_point
+
+// Create table
+if show_table
+    var table info_table = table.new(position.bottom_left, 2, 8, bgcolor=color.new(color.black, 20), border_width=1, border_color=color.gray)
+
+    // Table headers and values
+    if barstate.islast
+        // Removed commented out lines for Account Balance to keep the table concise as per original code.
+        table.cell(info_table, 0, 2, "ATR", text_color=color.white, text_size=size.normal)
+        table.cell(info_table, 1, 2, str.tostring(atr_value, "#.####"), text_color=color.white, text_size=size.normal)
+
+        table.cell(info_table, 0, 3, "Point Value", text_color=color.white, text_size=size.normal)
+        table.cell(info_table, 1, 3, "$" + str.tostring(dollar_per_point, "#.####"), text_color=color.white, text_size=size.normal)
+
+        table.cell(info_table, 0, 4, "Risk Amount", text_color=color.white, text_size=size.normal)
+        table.cell(info_table, 1, 4, "$" + str.tostring(max_loss, "#,###.##"), text_color=color.white, text_size=size.normal)
+
+        table.cell(info_table, 0, 5, "Unit Size", text_color=color.white, text_size=size.normal)
+        table.cell(info_table, 1, 5, str.tostring(unit_size, "#,###.####"), text_color=color.white, text_size=size.normal)
+
+// Add background color when ATR is very high (higher volatility)
+bgcolor(atr_value > ta.sma(atr_value, 50) * 1.5 ? color.new(color.red, 95) : na, title="High Volatility Warning")

@@ -2,13 +2,39 @@
 
 These scripts are designed for use on [TradingView](https://www.tradingview.com/), a popular platform for traders to perform technical analysis and execute trades. It combines essential tools like moving averages, candlestick identification, displacements, previous day alerts, and trade signals.
 
-Since TradingView offers only two indicators for free users, I’ve merged my strategies into one indicator. I mainly use [Tuspe Special Mix Indicator](./TuspeSpecialMix.pine) but most of strategies I explain here uses [Moving Averages Strategies Indicator](./MovingAveragesStrategies.pine) (MAS).
-
-These scripts are created and maintained by [Timo Anttila](https://timoanttila.com/). It’s free to use and modify, but I encourage collaboration - let’s improve this script together instead of creating separate versions. If you have suggestions or ideas, feel free to reach out.
+These scripts are created and maintained by [Timo Anttila](https://timoanttila.com/). It's free to use and modify, but I encourage collaboration - let's improve this script together instead of creating separate versions. If you have suggestions or ideas, feel free to reach out.
 
 ## Moving average (MA)
 
 An Exponential Moving Average (EMA) gives more weight to recent prices, making it more responsive than a Simple Moving Average (SMA). Moving averages (MAs) help identify trends, reversals, and potential entry or exit points. These scripts plot moving averages to capture short-, medium-, and long-term market movements. MAs can also act as dynamic support or resistance levels and are commonly used in crossover strategies to signal trend changes.
+
+## The Turtle Strategy
+
+[The Turtle Strategy Indicator](./Turtle.pine)
+
+**System 1:**  
+Buy 20-day breakout.  
+Exit 10-day low.
+
+**System 2:**  
+Buy 55-day breakout.  
+Exit 20-day low.
+
+N = 1 ATR
+
+Add units at each half N profit for pyramiding.
+
+**Exit rules:**  
+Initial stop: 2N  
+10- or 20-day reversal  
+Never move stops away from position.
+
+**Position sizing:**  
+Unit Size equals 1% of Account divided by N times Dollar Value per Point.
+
+N, Average True Range Calculation. Take the higher of: Today's high minus low, Today's high minus yesterday's close or yesterday's close minus today's low. Calculate 20-day average of above.
+
+[Read more](https://www.youtube.com/watch?v=g8XHUYVOPkU)
 
 ## The 10 EMA Strategy
 
