@@ -1,0 +1,167 @@
+// A simple trend-following strategy using multiple moving averages
+// and price action to generate entries, additions, and exits.
+// Best for trending markets.
+// © timoanttila
+
+//@version=6
+indicator("Trend is your friend", shorttitle="Trend", overlay=true, dynamic_requests=true)
+
+// ----------
+//  Moving Averages
+// ----------
+
+group1 = "Moving Averages"
+ma1_length = input.int(10, title="MA1 Length", minval=5, group=group1)
+ma1_type = input.string("EMA", title="MA1 Type", options=["SMA", "EMA"], group=group1)
+ma2_length = input.int(20, title="MA2 Length", minval=8, group=group1)
+ma2_type = input.string("SMA", title="MA2 Type", options=["SMA", "EMA"], group=group1)
+ma3_length = input.int(50, title="MA3 Length", minval=20, group=group1)
+ma3_type = input.string("SMA", title="MA3 Type", options=["SMA", "EMA"], group=group1)
+ma4_length = input.int(200, title="MA4 Length", minval=20, group=group1)
+ma4_type = input.string("SMA", title="MA4 Type", options=["SMA", "EMA"], group=group1)
+
+// Moving average calculation function
+calculate_ma(ma_type, src, length) =>
+    ma_type == "SMA" ? ta.sma(src, length) : ta.ema(src, length)
+
+// Calculate the moving averages
+ma1 = calculate_ma(ma1_type, close, ma1_length)
+ma2 = calculate_ma(ma2_type, close, ma2_length)
+ma3 = calculate_ma(ma3_type, close, ma3_length)
+ma4 = calculate_ma(ma4_type, close, ma4_length)
+
+// Plot moving averages
+plot(ma1, color=color.gray, linewidth=1, title="MA1")
+plot(ma2, color=color.yellow, linewidth=2, title="MA2")
+plot(ma3, color=color.orange, linewidth=2, title="MA3")
+plot(ma4, color=color.white, linewidth=3, title="MA4")
+
+// ----------
+//  Risk Management
+// ----------
+
+group2 = "Risk Management"
+n_bars = input.int(defval=5, title="Number of Bars for High/Low", minval=1, maxval=20, group=group2)
+body_percent = input.float(50, "Min Body %", minval=10, maxval=100)
+trade_more_max = input.int(2, "New entries after first entry", group=group2)
+
+// ----------
+//  Inside Bar
+// ----------
+
+prev_candle_high = high[1]
+prev_candle_low = low[1]
+prev_candle_full_size = math.abs(prev_candle_high - prev_candle_low)
+candle_full_size = math.abs(high - low)
+
+isInsideBar = barstate.isconfirmed and candle_full_size < prev_candle_full_size and prev_candle_high > high and prev_candle_low < low
+barcolor(isInsideBar ? color.yellow : na, title="Inside Bar")
+
+// ----------
+//  Global variables
+// ----------
+
+bool cross = false
+bool plus_icon = false
+int exit = 0
+var bool color_change = false
+var float pullback = 0
+var int entry = 0
+var int more_index = 0
+var int trend = 0
+
+// ----------
+//  Candle validation
+// ----------
+
+float candle_body_percent = candle_full_size > 0 ? (math.abs(close - open) / candle_full_size) * 100 : 0
+float highest = ta.highest(high, n_bars)[1]
+float lowest = ta.lowest(low, n_bars)[1]
+bool clearing_candle = trend == 1 ? close >= highest : close <= lowest
+bool candle_valid = candle_body_percent >= body_percent and clearing_candle
+
+// ----------
+//  The Turtle Strategy
+// ----------
+
+bool sys1_cross_long = ta.crossover(close, ma2)
+bool sys1_cross_short = ta.crossunder(close, ma2)
+
+if (sys1_cross_long and close > ma2) or (sys1_cross_short and close < ma2)
+    color_change := false
+    entry := 0
+    more_index := 0
+    pullback := 0
+    trend := sys1_cross_long ? 1 : 2
+    clearing_candle := trend == 1 ? close >= highest : close <= lowest
+    candle_valid := candle_body_percent >= body_percent and clearing_candle
+
+// If a cross has occurred but no entry is active
+if trend > 0 and entry == 0 and candle_valid
+    if (trend == 1 and close > open and close > ma2) or (trend == 2 and close < open and close < ma2)
+        entry := 1
+
+// ----------
+//  Pullback
+// ----------
+
+cross := ta.cross(close, ma1)
+
+if entry == 2 and pullback == 0
+    if not color_change
+        if trend == 1 and close < open
+            pullback := high
+        else if trend == 2 and close > open
+            pullback := low
+    else if cross and ((trend == 1 and ma1 > close) or (trend == 2 and close > ma1))
+        entry := 0
+        exit := trend
+
+else if candle_valid and pullback > 0 and ((trend == 1 and close >= pullback) or (trend == 2 and close <= pullback))
+    plus_icon := true
+    pullback := 0
+    if not color_change
+        color_change := true
+
+// ----------
+//  Candle crosses MA3
+// ----------
+
+cross := ta.cross(close, ma3)
+if entry == 2 and cross and not plus_icon and trade_more_max > more_index and candle_valid and ((trend == 1 and close > ma3) or (trend == 2 and close < ma3))
+    plus_icon := true
+
+// ----------
+// Plots
+// ----------
+
+plotshape(entry == 1 and trend == 1, title="Long Entry", style=shape.triangleup, location=location.belowbar, color=color.white, size=size.tiny)
+plotshape(entry == 1 and trend == 2, title="Short Entry", style=shape.triangledown, location=location.abovebar, color=color.white, size=size.tiny)
+plotshape(plus_icon and trend == 1, title="Long Add", style=shape.cross, location=location.belowbar, color=color.white, size=size.tiny)
+plotshape(plus_icon and trend == 2, title="Short Add", style=shape.cross, location=location.abovebar, color=color.white, size=size.tiny)
+plotshape(exit == 1, title="Exit Long", style=shape.xcross, location=location.belowbar, color=color.gray, size=size.tiny)
+plotshape(exit == 2, title="Exit Short", style=shape.xcross, location=location.abovebar, color=color.gray, size=size.tiny)
+
+// ----------
+// Alerts
+// ----------
+
+alertcondition(entry == 1, title="New Entry", message="New entry signal on {{ticker}}")
+alertcondition(entry == 1 or plus_icon, title="New Entry or More", message="New entry signal or time to add more on {{ticker}}")
+alertcondition(entry == 1 and trend == 1, title="New Entry Long", message="SYS1: New Entry on {{ticker}}")
+alertcondition(entry == 1 and trend == 2, title="New Entry Short", message="SYS1: New Entry on {{ticker}}")
+alertcondition(plus_icon, title="Add More", message="Add new position to winning trade on {{ticker}}")
+
+// ----------
+//  Reset dynamic values
+// ----------
+
+if entry == 1
+    entry := 2
+
+if exit > 0
+    exit := 0
+
+if plus_icon
+    more_index := more_index + 1
+    plus_icon := false
