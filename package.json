@@ -1,0 +1,13 @@
+{
+  "name": "trading-tuspe",
+  "version": "1.0.0",
+  "description": "A simple trend-following strategy using multiple moving averages and price action to generate entries, additions, and exits. Best for trending markets.",
+  "homepage": "https://github.com/timoanttila/trading-tuspe",
+  "bugs": "https://github.com/timoanttila/trading-tuspe/issues",
+  "author": {
+    "name": "Timo Anttila",
+    "email": "moro@tuspe.com",
+    "url": "https://timoanttila.com"
+  },
+  "license": "GPL-3.0"
+}
