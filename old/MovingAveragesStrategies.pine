@@ -1,0 +1,211 @@
+//@version=6
+indicator("Moving Averages Strategies [Tuspe]", shorttitle="MAS", overlay=true)
+
+// ----------
+//  Moving Averages
+// ----------
+
+ma1_length = input.int(50, title="MA1 Length", minval=1, group="Pullback Strategy")
+ma1_type = input.string("SMA", title="MA1 Type", options=["SMA", "EMA"], group="Pullback Strategy")
+
+ma2_length = input.int(9, title="MA2 Length", minval=1, group="Crossover Strategy")
+ma2_type = input.string("EMA", title="MA2 Type", options=["SMA", "EMA"], group="Crossover Strategy")
+
+ma3_length = input.int(20, title="MA3 Length", minval=1, group="Crossover Strategy")
+ma3_type = input.string("SMA", title="MA3 Type", options=["SMA", "EMA"], group="Crossover Strategy")
+
+ma4_length = input.int(200, title="MA4 Length", minval=5, group="Long-term Trend")
+ma4_type = input.string("SMA", title="MA4 Type", options=["SMA", "EMA"], group="Long-term Trend")
+
+// Moving average calculation function
+calculate_ma(ma_type, src, length) =>
+    ma_type == "SMA" ? ta.sma(src, length) : ta.ema(src, length)
+
+// Calculate the moving averages
+ma1 = calculate_ma(ma1_type, close, ma1_length)
+ma2 = calculate_ma(ma2_type, close, ma2_length)
+ma3 = calculate_ma(ma3_type, close, ma3_length)
+ma4 = calculate_ma(ma4_type, close, ma4_length)
+
+// Plot moving averages
+plot(ma1, color=color.yellow, linewidth=3, title="MA1")
+plot(ma2, color=color.aqua, linewidth=1, title="MA2")
+plot(ma3, color=color.orange, linewidth=1, title="MA3")
+plot(ma4, color=color.white, linewidth=2, title="MA4")
+
+// ----------
+//  Displacement
+// ----------
+
+rangeType = input.string("Open to Close", "Range Type", options = ['Open to Close', 'High to Low'], group="Displacement")
+devPeriod = input.int(100, minval = 1, title = "Deviation Period", group="Displacement")
+devMultiplier = input.int(3, minval = 0, title = "Deviation Multiplier", group="Displacement")
+
+priceRange = rangeType == "Open to Close" ? math.abs(open - close) : high - low
+rangeDeviation = ta.stdev(priceRange, devPeriod) * devMultiplier
+
+priceGap = close[1] > open[1] ? high[2] < low[0] : low[2] > high[0]
+isDisplaced = priceRange[1] > rangeDeviation[1] and priceGap
+
+barcolor(isDisplaced ? color.maroon : na, offset = -1, title="Displacement Highlight Color")
+alertcondition(isDisplaced, title="Elephant Bar", message="New Displacement / Elephant Bar detected!")
+
+// ----------
+//  Pullback Strategy
+// ----------
+
+// State variables for pullback strategy
+var int ma1CrossState = 0 // 0: no cross, 1: bullish cross, -1: bearish cross
+var float markedXRefPrice = na // Stores the reference price (high/low) of the 'X' candle
+
+// MA1 Crossover Detection
+bool ma1CrossUp = ta.cross(close, ma1) and close > ma1[1]
+bool ma1CrossDown = ta.cross(close, ma1) and close < ma1[1]
+
+// Reset state on new MA1 crossover or price going against MA1 (trend invalidation)
+if ma1CrossUp
+    ma1CrossState := 1
+    markedXRefPrice := na // Reset marked price
+else if ma1CrossDown
+    ma1CrossState := -1
+    markedXRefPrice := na // Reset marked price
+// Additional reset if price closes against the MA1 trend after a cross was established
+else if (ma1CrossState == 1 and close < ma1) or (ma1CrossState == -1 and close > ma1)
+    ma1CrossState := 0
+    markedXRefPrice := na
+
+// Bullish Pullback: First Red Candle (Mark X)
+bool bullishPullbackX = false
+// Check if bullish cross is active AND no X candle has been marked yet
+if ma1CrossState == 1 and na(markedXRefPrice)
+    // Current candle is red
+    if close < open
+        markedXRefPrice := high // Store the HIGH of the red 'X' candle
+        bullishPullbackX := true
+
+// Bearish Pullback: First Green Candle (Mark X)
+bool bearishPullbackX = false
+// Check if bearish cross is active AND no X candle has been marked yet
+if ma1CrossState == -1 and na(markedXRefPrice)
+    // Current candle is green
+    if close > open
+        markedXRefPrice := low // Store the LOW of the green 'X' candle
+        bearishPullbackX := true
+
+// Bullish Execution: Green candle closes above marked X candle's high
+bool bullishExecution = false
+// Check if bullish cross is active AND an X candle has been marked
+if ma1CrossState == 1 and not na(markedXRefPrice)
+    // Current candle is green AND closes above the marked red candle's HIGH
+    if close > open and close > markedXRefPrice
+        bullishExecution := true
+        ma1CrossState := 0 // Reset state after execution
+        markedXRefPrice := na // Reset marked price after execution
+
+// Bearish Execution: Red candle closes below marked X candle's low
+bool bearishExecution = false
+// Check if bearish cross is active AND an X candle has been marked
+if ma1CrossState == -1 and not na(markedXRefPrice)
+    // Current candle is red AND closes below the marked green candle's LOW
+    if close < open and close < markedXRefPrice
+        bearishExecution := true
+        ma1CrossState := 0 // Reset state after execution
+        markedXRefPrice := na // Reset marked price after execution
+
+// Plotting the signals
+plotshape(bullishPullbackX, style=shape.cross, location=location.belowbar, color=color.white, size=size.tiny, title="Bullish X")
+plotshape(bearishPullbackX, style=shape.cross, location=location.abovebar, color=color.white, size=size.tiny, title="Bearish X")
+
+plotshape(bullishExecution, style=shape.triangleup, location=location.belowbar, color=color.white, size=size.small, title="Bullish Execution")
+plotshape(bearishExecution, style=shape.triangledown, location=location.abovebar, color=color.white, size=size.small, title="Bearish Execution")
+
+alertcondition(bullishPullbackX or bearishPullbackX, title="Pullback event", message="A pullback has begun. You can place an order above (bulls) or below (bears) the marked candle.")
+alertcondition(bullishExecution or bearishExecution, title="Continuation after pullback", message="The pullback is over and the price continues to move in the original direction. Good luck and happy trading!")
+
+// ----------
+//  MA Crossover
+// ----------
+
+bullCross1 = (ta.crossover(ma2, ma3) and ma3 > ma1)
+bullCross2 = (ta.crossover(ma2, ma1) and ma2 > ma3)
+bearCross1 = ta.crossunder(ma2, ma3) and ma3 < ma1
+bearCross2 = ta.crossunder(ma2, ma1) and ma2 < ma3
+
+plotshape(series=bullCross1, title="Bullish Crossover", location=location.belowbar, style=shape.diamond, color=color.white, size=size.tiny)
+plotshape(series=bearCross1, title="Bearish Crossover", location=location.abovebar, style=shape.diamond, color=color.white, size=size.tiny)
+plotshape(series=bullCross2, title="Bullish Continuation", location=location.belowbar, style=shape.flag, color=color.white, size=size.small)
+plotshape(series=bearCross2, title="Bearish Continuation", location=location.abovebar, style=shape.flag, color=color.white, size=size.small)
+
+alertcondition(bullCross2, title="Golden Crossover", message="New Golden Crossover signal detected! Good luck and happy trading!")
+alertcondition(bearCross2, title="Death Crossover", message="New Death Crossover signal detected! Good luck and happy trading!")
+alertcondition(bullCross1 or bullCross2 or bearCross1 or bearCross2, title="Golden and Death Crossover", message="New Golden / Death Crossover signal detected! Good luck and happy trading!")
+alertcondition(bullCross2 or bearCross2, title="Golden and Death Crossover (MA1)", message="New Golden / Death Crossover signal detected (MA1)! Good luck and happy trading!")
+
+// ----------
+//  Previous Day High and Low
+// ----------
+
+// User input for color
+lineAndTextColor = input.color(color.white, "Line and Text Color", inline="group1", group="Previous Day High and Low")
+
+// Detect new day
+currDay = dayofweek
+currSession = dayofmonth
+newDay = currDay != currDay[1] or currSession != currSession[1]
+
+// Get previous day high and low
+[dh, dl] = request.security(syminfo.tickerid, "D", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+
+// Track the start bar for drawing
+var int startBar = na
+if newDay
+    startBar := bar_index
+
+// Draw persistent lines and text
+var line lineHigh = na
+var line lineLow = na
+var label textHigh = na
+var label textLow = na
+
+if newDay
+    if not na(lineHigh)
+        line.delete(lineHigh)
+    if not na(lineLow)
+        line.delete(lineLow)
+    if not na(textHigh)
+        label.delete(textHigh)
+    if not na(textLow)
+        label.delete(textLow)
+
+    // Calculate endBar for current day + 5 future bars
+    endBar = bar_index + 5
+
+    lineHigh := line.new(x1=startBar, y1=dh, x2=endBar, y2=dh, color=lineAndTextColor, width=1)
+    lineLow  := line.new(x1=startBar, y1=dl, x2=endBar, y2=dl, color=lineAndTextColor, width=1)
+
+    // Text label position (same as line end)
+    transparent = color.new(lineAndTextColor, 100) // Use the chosen color with 100% transparency
+    textHigh := label.new(x=endBar, y=dh, text="PDH", style=label.style_label_left, textcolor=lineAndTextColor, size=size.small, color=transparent)
+    textLow  := label.new(x=endBar, y=dl, text="PDL", style=label.style_label_left, textcolor=lineAndTextColor, size=size.small, color=transparent)
+
+// Keep updating end of line and text position for current day + 5 future bars
+if not na(lineHigh)
+    line.set_x2(lineHigh, bar_index + 5)
+if not na(lineLow)
+    line.set_x2(lineLow, bar_index + 5)
+if not na(textHigh)
+    label.set_x(textHigh, bar_index + 5)
+if not na(textLow)
+    label.set_x(textLow, bar_index + 5)
+
+// Alert condition: price open inside previous day range and high breaks above PDH or low breaks below PDL
+insidePrevDayRange = open >= dl and open <= dh
+breaksAbove = high > dh and insidePrevDayRange
+breaksBelow = low < dl and insidePrevDayRange
+alertcondition(breaksAbove or breaksBelow, title="Previous Day Range", message="Price opened inside previous day and broke above or below. Good luck and happy trading!")
+
+// ----------
+//  All Strategies
+// ----------
+
+alertcondition(bullishExecution or bearishExecution or bullCross2 or bearCross2 or breaksAbove or breaksBelow, title="Strategy Merge", message="New moving average crossover, pullback continuation or previous day range hit detected! Good luck and happy trading!")

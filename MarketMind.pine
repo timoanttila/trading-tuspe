@@ -1,0 +1,2362 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// @ EzAlgo
+
+//@version=5
+indicator("Market Mind", overlay=true, max_bars_back=5000, max_lines_count=500, max_boxes_count=500, max_labels_count=500)
+
+//-----------------------------------------------------------------------------
+// Input Settings
+//-----------------------------------------------------------------------------
+
+i_1 = "Order Blocks represent significant price levels where large orders were executed, potentially indicating future support or resistance areas."
+i_2 = "Market Structure refers to the overall trend and key price levels, such as Higher Highs, Higher Lows, Lower Highs, and Lower Lows."
+i_3 = "FVGs represent price areas where a significant gap occurred between two trading sessions, indicating a potential continuation or reversal point."
+i_4 = "Liquidity Levels indicate price areas where there is a significant increase in trading volume and potential support or resistance."
+i_5 = "Key Levels represent significant price levels based on different timeframes, such as Previous Day High/Low, Weekly Open, Monthly Open, etc."
+i_6 = "Session Levels indicate the High, Low, and Open prices of different trading sessions, such as London, New York, and Tokyo."
+i_7 = "Dealing Range represents the area between the highest high and lowest low over a specified period, indicating the current trading range."
+i_8 = "POC represents the price level with the highest trading volume over a specified period, often considered as a key support or resistance level."
+i_9 = "Displacement represents a significant price move or gap that occurs within a single candle, often indicating a strong shift in market sentiment."
+i_10 = "Trend Lines are diagonal lines drawn on a chart to connect a series of highs or lows, used to identify and confirm the direction of the market trend, and to indicate potential support and resistance levels."
+
+
+//----------------------------------------
+// Order Blocks
+//----------------------------------------
+
+in_ob_1 = input.bool(true, "Order Blocks", group="Order Blocks", inline="ob1", tooltip = i_1)
+in_ob_2 = input.color(#b2b5be19, "", inline="ob1", group="Order Blocks")
+in_ob_3 = input.color(#b2b5be19, "", inline="ob1", group="Order Blocks")
+in_ob_4 = "All"//input.string("All", "", options=["All", "Internal", "External"], group="Order Blocks", inline="ob1")
+in_ob_5 = input.timeframe("", "Timeframe", group="Order Blocks", inline="ob2")
+in_ob_6 = input.string("Average", "Mitigation Method", options=["Touch", "Wicks", "Close", "Average"], group="Order Blocks", inline="ob3")
+in_ob_7 = input(true, "Hide Overlap", inline="ob3", group="Order Blocks")
+in_ob_8 = input.int(5, "Max OBs", minval=3, group="Order Blocks", inline="ob4")
+in_ob_9 = input.int(defval=22, title="Length", minval=0, maxval=500, group="Order Blocks", inline="ob4")
+in_ob_10 = input.bool(false, "Extend", group="Order Blocks", inline="ob4")
+
+in_ob_11 = input.string("Medium", options=["Small", "Medium", "Large"], title="Text Size", inline="ob1_t", group="Order Blocks")
+in_ob_12 = in_ob_11 == "Small" ? size.tiny : in_ob_11 == "Medium" ? size.small : size.normal
+in_ob_13 = input.color(#b2b5be, "", inline="ob1_t", group="Order Blocks")
+in_ob_14 = input.bool(true, "Volume", group="Order Blocks", inline="ob1_t")
+in_ob_15 = input.bool(true, "Percentage", group="Order Blocks", inline="ob1_t")
+
+in_ob_16 = input.string("Off", title="Mid Line", options=["On", "Off"], group="Order Blocks", inline="ob1_l")
+in_ob_17 = in_ob_16 == "On"
+in_ob_18 = input.string("Solid", title="Line Style", options=["Solid", "Dashed", "Dotted"], group="Order Blocks", inline="ob1_l")
+in_ob_19 = in_ob_18 == "Solid" ? line.style_solid : in_ob_18 == "Dashed" ? line.style_dashed : line.style_dotted
+
+in_ob_20 = input.bool(false, "MTF Order Blocks", group="Order Blocks", inline="m_ob1", tooltip = i_1)
+in_ob_21 = input.color(#b2b5be19, "", inline="m_ob1", group="Order Blocks")
+in_ob_22 = input.color(#b2b5be19, "", inline="m_ob1", group="Order Blocks")
+in_ob_23 = "All"//input.string("All", "", options=["All", "Internal", "External"], group="Order Blocks", inline="m_ob1")
+in_ob_24 = input.timeframe("240", "Timeframe", group="Order Blocks", inline="mob2")
+in_ob_25 = input.string("Average", "Mitigation Method", options=["Touch", "Wicks", "Close", "Average"], group="Order Blocks", inline="mob3")
+in_ob_26 = input(false, "Hide Overlap", inline="mob3", group="Order Blocks")
+in_ob_27 = input.int(3, "Max OBs", minval=3, group="Order Blocks", inline="mob4")
+in_ob_28 = input.int(defval=22, title="Length", minval=0, maxval=500, group="Order Blocks", inline="mob4")
+in_ob_29 = input.bool(false, "Extend", group="Order Blocks", inline="mob4")
+
+in_ob_30 = input.string("Medium", options=["Small", "Medium", "Large"], title="Text Size", inline="ob2_t", group="Order Blocks")
+in_ob_31 = in_ob_30 == "Small" ? size.tiny : in_ob_30 == "Medium" ? size.small : size.normal
+in_ob_32 = input.color(#b2b5be, "", inline="ob2_t", group="Order Blocks")
+in_ob_33 = input.bool(true, "Volume", group="Order Blocks", inline="ob2_t")
+in_ob_34 = input.bool(true, "Percentage", group="Order Blocks", inline="ob2_t")
+
+in_ob_35 = input.string("Off", title="Mid Line", options=["On", "Off"], group="Order Blocks", inline="ob2_l")
+in_ob_36 = in_ob_35 == "On"
+in_ob_37 = input.string("Solid", title="Line Style", options=["Solid", "Dashed", "Dotted"], group="Order Blocks", inline="ob2_l")
+in_ob_38 = in_ob_37 == "Solid" ? line.style_solid : in_ob_37 == "Dashed" ? line.style_dashed : line.style_dotted
+
+in_ob_39 = input.bool(true, 'Internal Bull/Bear Activity', group='Order Blocks',inline = 'volume')
+in_ob_40 =  input.color(color.new(color.green, 60), "", inline="volume", group="Order Blocks")
+in_ob_41 = input.color(color.new(color.red, 60), "", inline="volume", group="Order Blocks")
+
+in_ob_42 = input.string("Lines", "OB Style", options=["Zones", "Lines"], group="Order Blocks", inline="ob_s")
+
+in_ob_43 = input.string("Dotted", "Line Style", options=["Solid", "Dashed","Dotted"], group="Order Blocks", inline="ob_line_style")
+in_ob_44 = in_ob_43 == "Solid" ? line.style_solid : in_ob_43 == "Dashed" ? line.style_dashed : line.style_dotted
+in_ob_45 = input.int(2, "Line Width", minval=1,maxval = 4, group="Order Blocks", inline="ob_line_style")
+
+in_ob_46 = input.color(#b2b5be, "Line Color", inline="l_c", group="Order Blocks")
+in_ob_47 = input.color(#b2b5be, "", inline="l_c", group="Order Blocks")
+
+if in_ob_42 == "Lines"
+    in_ob_2  := in_ob_46
+    in_ob_3  := in_ob_47
+    in_ob_21 := in_ob_46
+    in_ob_22 := in_ob_47
+
+var_ob_1 = in_ob_24 == "" ? timeframe.period : in_ob_24
+var_ob_2 = not (str.contains(var_ob_1, "S") or str.contains(var_ob_1, "D") or str.contains(var_ob_1, "W") or str.contains(var_ob_1, "M")) ? str.tonumber(var_ob_1) >= 60 ? str.tostring(str.tonumber(var_ob_1) / 60) + "H" : var_ob_1 + "M" : var_ob_1
+
+var_ob_3 = var_ob_2 + " : "
+var_ob_4 = in_ob_4 == "All" or in_ob_4 == "Internal"
+var_ob_5 = in_ob_4 == "All" or in_ob_4 == "External"
+var_ob_6 = in_ob_23 == "All" or in_ob_23 == "Internal"
+var_ob_7 = in_ob_23 == "All" or in_ob_23 == "External"
+var_ob_8 = 5
+var_ob_9 = 5
+var_ob_10 = 3
+var_ob_10 := var_ob_10 == 3 ? 20 : var_ob_10
+
+style = "Colored"
+var_ob_11 = 10
+var_ob_12 = 10
+var_ob_13 = (time[1] - time[101]) / 100
+
+//----------------------------------------
+// BOS and MSS
+//----------------------------------------
+
+// Constants
+color CLEAR = color.rgb(0, 0, 0, 100)
+
+// Inputs
+in_ms_1 = input(true, title="Market Structure ", inline="0", group="Market Structure", tooltip = i_2)
+in_ms_2 = input.color(#b2b5be9a, "", group="Market Structure", inline="0")
+in_ms_3 = input.color(#b2b5be9a, "", group="Market Structure", inline="0")
+in_ms_4 = input.string("All", options=["All", "External", "Internal"], title="", group="Market Structure", inline="0")
+length = 50//input.int(50, "Lookback", minval=0, maxval=100, group="Market Structure", inline="01")
+in_ms_5 = input(false, "Equal Highs & Lows", group="Market Structure", inline="equilibrium_zone")
+in_ms_6 = input.color(#e91e63, "", group="Market Structure", inline="equilibrium_zone")
+in_ms_7 = input.color(#2962ff, "", group="Market Structure", inline="equilibrium_zone")
+
+in_ms_8 = input.float(0.05, "", minval=0, maxval=0.5, step=0.1, group="Market Structure", inline="equilibrium_zone")
+in_ms_9 = input.bool(false, "Swing Points", group="Market Structure", inline="3")
+in_ms_10 = input.int(10, "Swing Point Period", inline="4", group="Market Structure")
+in_ms_11 = input.string("Medium", options=["Small", "Medium", "Large"], title="Label Size", inline="4", group="Market Structure")
+in_ms_12 = in_ms_11 == "Small" ? size.tiny : in_ms_11 == "Medium" ? size.small : size.normal
+in_ms_13 = in_ms_11 == "Small" ? size.tiny : in_ms_11 == "Medium" ? size.small : size.normal
+in_ms_14 = input.color(color.new(color.white, 40), "", group="Market Structure", inline="3")
+
+in_ms_15 = 3
+in_ms_16 = 3
+
+//----------------------------------------
+// Displacement
+//----------------------------------------
+
+in_dis_1 = input(defval=true, title='Show Displacement Candles', group="Displacement",inline = '1', tooltip = i_9)
+in_dis_2 = input.color(#e91e63, "", group="Displacement",inline = '1')
+in_dis_3 = input.color(#2962ff, "", group="Displacement",inline = '1')
+in_dis_4 = input.string("Candle Body", "Type", options = ['Candle Body', 'Full Candle'], group="Displacement",inline = '2')
+in_dis_5 = input.int(2, minval = 0,maxval = 3, title = "Strength", group="Displacement",inline = '2')
+mss_filter_disp =  input(defval=true, title='Structure Filter', group="Displacement",inline = '3')
+
+//----------------------------------------
+// Fair Value Gaps (FVG)
+//----------------------------------------
+
+in_fvg_1 = input(true, "Fair Value Gaps (FVG)", group="Fair Value Gaps", inline="fvg_css", tooltip = i_3)
+in_fvg_2 = input.timeframe("", "Timeframe", group="Fair Value Gaps", inline="tf")
+in_fvg_op = input.int(defval=12, title="Opacity %", minval=0, maxval=100, group="Fair Value Gaps", inline="tf")
+in_fvg_3 = input.float(2, "Max Width", minval=0, maxval=5.0, step=0.1, group="Fair Value Gaps", inline="width")
+in_fvg_4 = input.bool(true, "Filter FVG", group="Fair Value Gaps", inline="width")
+in_fvg_5 = input.string("Average", "Mitigation Method", options=["Touch", "Wicks", "Close", "Average"], group="Fair Value Gaps", inline="mt")
+in_fvg_6 = input.bool(true, "Fill", group="Fair Value Gaps", inline="mt")
+in_fvg_7 = input.bool(false, "Shade", group="Fair Value Gaps", inline="mt")
+in_fvg_8 = input.int(defval=5, title="Max FVG", minval=0, maxval=50, group="Fair Value Gaps", inline="OS")
+in_fvg_9 = input.int(defval=20, title="Length", minval=0, maxval=100, group="Fair Value Gaps", inline="OS")
+in_fvg_10 = input.bool(false, "Extend", group="Fair Value Gaps", inline="OS")
+in_fvg_11 = input.color(#4346511e, "", group="Fair Value Gaps", inline="fvg_css")
+in_fvg_12 = input.color(#4346511e, "", group="Fair Value Gaps", inline="fvg_css")
+mid_line_show = input.string("Off", " Mid Line", ["On", "Off"], group="Fair Value Gaps", inline="mid")
+in_fvg_13 = input.string("Solid", "  Style", ["Solid", "Dashed", "Dotted"], group="Fair Value Gaps", inline="mid")
+in_fvg_14 = input.color(color.new(color.white, 40), "", group="Fair Value Gaps", inline="mid")
+in_fvg_14_2 = input.color(color.new(color.white, 40), "", group="Fair Value Gaps", inline="mid")
+in_fvg_16 = input.int(defval=2, title="Line Width", minval=1, maxval=5, group="Fair Value Gaps", inline="mid_w")
+in_fvg_15 = input.bool(true, "Extend (Current)", group="Fair Value Gaps", inline="mid_w")
+
+var_fvg_1 = color.new(color.green, 100)
+var_fvg_2 = color.new(color.green, 90)
+var_fvg_3 = true
+var_fvg_4 = true
+var_fvg_5 = color.white
+var_fvg_6 = "HTF"
+var_fvg_7 = 10
+var_fvg_8 = 50
+in_fvg_op := 100 - in_fvg_op
+
+
+//----------------------------------------
+// Liquidity Levels
+//----------------------------------------
+
+liquidity_level_group = "Liquidity Levels"
+
+in_liq_1 = input.bool(true, title="Liquidity Levels", group=liquidity_level_group, inline="1", tooltip = i_4)
+in_liq_2 = input.timeframe("", title="Timeframe", inline="1_", group=liquidity_level_group)
+in_liq_3 = input.int(10, title="Pivot Length", group=liquidity_level_group, inline="2")
+in_liq_4 = input.string("Remove", title="Mitigated", inline="3", options=["Remove", "Show"], group=liquidity_level_group)
+in_liq_5 = input.string("Close", title="Method", options=["Close", "Wick"], group=liquidity_level_group, inline="3")
+in_liq_6 = input.int(4, title="Max Levels", group=liquidity_level_group, inline="4")
+in_liq_7 = input.int(defval=20, title="Length", minval=0, maxval=500, group=liquidity_level_group, inline="4")
+in_liq_8 = "Solid"
+in_liq_9 = in_liq_8 == "Solid" ? line.style_solid : in_liq_8 == "Dashed" ? line.style_dashed : line.style_dotted
+in_liq_10 = 2.5
+in_liq_11 = input.color(#b2b5be, "", group=liquidity_level_group, inline="1")
+in_liq_12 = input.color(#00ddff, "", group=liquidity_level_group, inline="1")
+
+in_liq_13 = input.bool(true, title="Show Text", group=liquidity_level_group, inline="5")
+in_liq_14 = input.color(#b2b5be, "", inline="5", group=liquidity_level_group)
+in_liq_14_2 = input.color(#00ddff, "", inline="5", group=liquidity_level_group)
+
+in_liq_15 = color.new(in_liq_12, 90)
+in_liq_16 = color.new(in_liq_11, 90)
+in_liq_17 = input.string("Lines", "", options=["Boxes", "Lines"], group=liquidity_level_group, inline="1")
+in_liq_18 = input.int(defval=1, title="Line Width", minval=0, maxval=5, group=liquidity_level_group, inline="6")
+in_liq_19 = input.bool(false, title="Extend", group=liquidity_level_group, inline="6")
+//'Lines'//"Boxes"
+
+//----------------------------------------
+// Key Levels
+//----------------------------------------
+
+var in_kl_1 = input.bool(defval=false, title="4H", group="Key Levels", inline="4H", tooltip = i_5)
+in_kl_2 = input.color(title="", defval=color.orange, group="Key Levels", inline="4H")
+in_kl_3 = input.string("Dotted", "  Style", ["Solid", "Dashed", "Dotted"], group="Key Levels", inline="4H")
+in_kl_4 = input.bool(defval=true, title="Shorten", group="Key Levels", inline="4H")
+
+var in_kl_5 = input.bool(defval=false, title="Daily", group="Key Levels", inline="Daily", tooltip = i_5)
+in_kl_6 = input.color(title="", defval=color.purple, group="Key Levels", inline="Daily")
+in_kl_7 = input.string("Dotted", "  Style", ["Solid", "Dashed", "Dotted"], group="Key Levels", inline="Daily")
+in_kl_8 = input.bool(defval=true, title="Shorten", group="Key Levels", inline="Daily")
+
+var in_kl_9 = input.bool(defval=false, title="Monday", group="Key Levels", inline="Monday", tooltip = i_5)
+in_kl_10 = input.color(title="", defval=color.white, group="Key Levels", inline="Monday")
+in_kl_11 = input.string("Dotted", "  Style", ["Solid", "Dashed", "Dotted"], group="Key Levels", inline="Monday")
+in_kl_12 = input.bool(defval=true, title="Shorten", group="Key Levels", inline="Monday")
+
+var in_kl_13 = input.bool(defval=false, title="Weekly", group="Key Levels", inline="Weekly", tooltip = i_5)
+in_kl_14 = input.color(title="", defval=color.yellow, group="Key Levels", inline="Weekly")
+in_kl_15 = input.string("Dotted", "  Style", ["Solid", "Dashed", "Dotted"], group="Key Levels", inline="Weekly")
+in_kl_16 = input.bool(defval=true, title="Shorten", group="Key Levels", inline="Weekly")
+
+var in_kl_17 = input.bool(defval=false, title="Monthly", group="Key Levels", inline="Monthly", tooltip = i_5)
+in_kl_18 = input.color(title="", defval=color.green, group="Key Levels", inline="Monthly")
+in_kl_19 = input.string("Dotted", "  Style", ["Solid", "Dashed", "Dotted"], group="Key Levels", inline="Monthly")
+in_kl_20 = input.bool(defval=true, title="Shorten", group="Key Levels", inline="Monthly")
+
+var in_kl_21 = input.bool(defval=false, title="Quarterly", group="Key Levels", inline="Quarterly", tooltip = i_5)
+in_kl_22 = input.color(title="", defval=color.new(color.white, 80), group="Key Levels", inline="Quarterly")
+in_kl_23 = input.string("Dotted", "  Style", ["Solid", "Dashed", "Dotted"], group="Key Levels", inline="Quarterly")
+in_kl_24 = input.bool(defval=true, title="Shorten", group="Key Levels", inline="Quarterly")
+
+var in_kl_25 = input.bool(defval=false, title="Yearly", group="Key Levels", inline="Yearly", tooltip = i_5)
+in_kl_26 = input.color(title="", defval=color.new(color.white, 90), group="Key Levels", inline="Yearly")
+in_kl_27 = input.string("Dotted", "  Style", ["Solid", "Dashed", "Dotted"], group="Key Levels", inline="Yearly")
+in_kl_28 = input.bool(defval=true, title="Shorten", group="Key Levels", inline="Yearly")
+
+in_kl_29 = input.string(defval="Medium", title="Text Size", options=["Small", "Medium", "Large"], group="Key Levels", inline="H")
+
+
+
+var var_kl_1 = in_kl_8 ? "PDH" : "Prev Day High"
+var var_kl_2 = in_kl_8 ? "PDL" : "Prev Day Low"
+var var_kl_3 = in_kl_8 ? "DO" : "Daily Open"
+var var_kl_4 = in_kl_8 ? "PDM" : "Prev Day Mid"
+var var_kl_5 = in_kl_16 ? "PWH" : "Prev Week High"
+var var_kl_6 = in_kl_16 ? "PWL" : "Prev Week Low"
+var var_kl_7 = in_kl_16 ? "WO" : "Weekly Open"
+var var_kl_8 = in_kl_16 ? "PWM" : "Prev Week Mid"
+var var_kl_9 = in_kl_20 ? "PMH" : "Prev Month High"
+var var_kl_10 = in_kl_20 ? "PML" : "Prev Month Low"
+var var_kl_11 = in_kl_20 ? "MO" : "Monthly Open"
+var var_kl_12 = in_kl_20 ? "PMM" : "Prev Month Mid"
+var var_kl_13 = in_kl_24 ? "PQH" : "Prev Quarter High"
+var var_kl_14 = in_kl_24 ? "PQL" : "Prev Quarter Low"
+var var_kl_15 = in_kl_24 ? "QO" : "Quarterly Open"
+var var_kl_16 = in_kl_24 ? "PQM" : "Prev Quarter Mid"
+var var_kl_17 = in_kl_28 ? "CYH" : "Current Year High"
+var var_kl_18 = in_kl_28 ? "CYL" : "Current Year Low"
+var var_kl_19 = in_kl_28 ? "YO" : "Yearly Open"
+var var_kl_20 = in_kl_28 ? "CYM" : "Current Year Mid"
+var var_kl_21 = in_kl_4 ? "P-4H-H" : "Prev 4H High"
+var var_kl_22 = in_kl_4 ? "P-4H-L" : "Prev 4H Low"
+var var_kl_23 = in_kl_4 ? "4H-O" : "4H Open"
+var var_kl_24 = in_kl_4 ? "P-4H-M" : "Prev 4H Mid"
+var var_kl_25 = in_kl_12 ? "MDAY-H" : "Monday High"
+var var_kl_26 = in_kl_12 ? "MDAY-L" : "Monday Low"
+var var_kl_27 = in_kl_12 ? "MDAY-M" : "Monday Mid"
+
+var_kl_28 = "Standard"
+var_kl_29 = 25
+var_kl_30 = 250
+linesize = "Small"
+linestyle = "Solid"
+var var_kl_31 = false
+
+//----------------------------------------
+// Session Levels
+//----------------------------------------
+
+var in_sl_1 = input.bool(defval=false, title="London", group="Session Levels", inline="london", tooltip = i_6)
+var in_sl_2 = input.bool(defval=true, title="O/C", group="Session Levels", inline="london")
+var in_sl_3 = input.bool(defval=true, title="H/L", group="Session Levels", inline="london")
+var in_sl_4 = input.bool(defval=false, title="New York", group="Session Levels", inline="US", tooltip = i_6)
+var in_sl_5 = input.bool(defval=true, title="O/C", group="Session Levels", inline="US")
+var in_sl_6 = input.bool(defval=true, title="H/L", group="Session Levels", inline="US")
+var in_sl_7 = input.bool(defval=false, title="Tokyo", group="Session Levels", inline="asia", tooltip = i_6)
+var in_sl_8 = input.bool(defval=true, title="O/C", group="Session Levels", inline="asia")
+var in_sl_9 = input.bool(defval=true, title="H/L", group="Session Levels", inline="asia")
+in_sl_10 = false
+
+in_sl_11 = "0800-1600"
+in_sl_12 = "1400-2100"
+in_sl_13 = "0000-0900"
+
+in_sl_14 = input.color(title="", defval=color.white, group="Session Levels", inline="london")
+in_sl_15 = input.color(title="", defval=color.white, group="Session Levels", inline="US")
+in_sl_16 = input.color(title="", defval=color.white, group="Session Levels", inline="asia")
+
+in_sl_17 = input.bool(defval=true, title="Shorten", group="Session Levels", inline="london")
+in_sl_18 = input.bool(defval=true, title="Shorten", group="Session Levels", inline="US")
+in_sl_19 = input.bool(defval=true, title="Shorten", group="Session Levels", inline="asia")
+
+var var_sl_1 = in_sl_17 ? "Lon-H" : "London High"
+var var_sl_2 = in_sl_17 ? "Lon-L" : "London Low"
+var var_sl_3 = in_sl_17 ? "Lon-O" : "London Open"
+
+var var_sl_4 = in_sl_18 ? "NY-H" : "New York High"
+var var_sl_5 = in_sl_18 ? "NY-L" : "New York Low"
+var var_sl_6 = in_sl_18 ? "NY-O" : "New York Open"
+
+var var_sl_7 = in_sl_19 ? "TK-H" : "Tokyo High"
+var var_sl_8 = in_sl_19 ? "TK-L" : "Tokyo Low"
+var var_sl_9 = in_sl_19 ? "TK-O" : "Tokyo Open"
+
+
+//----------------------------------------
+// Dealing Range
+//----------------------------------------
+
+in_dr_1 = input.bool(defval=true, title="Dealing Range", group="Dealing Range", inline="1", tooltip = i_7)
+in_dr_2 = input.color(#00ddff1b,"", inline="1", group="Dealing Range")
+in_dr_3 = input.color(#b2b5be27, "", inline="1", group="Dealing Range")
+in_dr_4 = input.int(50, minval = 0, title = "Offset", inline="2", group="Dealing Range")
+
+//----------------------------------------
+// Point of Control
+//----------------------------------------
+
+in_poc_1 = input(defval=true, title='Show POC Line', group="POINT OF CONTROL",inline = '1', tooltip = i_8)
+in_poc_2 = input(defval=#fff176, title='', group="POINT OF CONTROL",inline = '1')
+
+in_poc_3 = input.string("Solid", title="Line Style", options=["Solid", "Dashed", "Dotted"], group="POINT OF CONTROL", inline="22")
+in_poc_4 = in_poc_3 == "Solid" ? line.style_solid : in_poc_3 == "Dashed" ? line.style_dashed : line.style_dotted
+in_poc_5 = input.int(2, minval = 0, title = "Width", group="POINT OF CONTROL",inline = '2')
+in_poc_6 = input.int(20, minval = 0, title = "Line Length", group="POINT OF CONTROL",inline = '2')
+
+in_poc_7 = input.string("Medium", options=["Small", "Medium", "Large"], title="Text Size", inline="3", group="POINT OF CONTROL")
+in_poc_8 = in_poc_7 == "Small" ? size.tiny : in_poc_7 == "Medium" ? size.small : size.normal
+in_poc_9 = input(defval=true, title='Show Text', group="POINT OF CONTROL",inline = '3')
+
+
+//----------------------------------------
+// TrendLines
+//----------------------------------------
+
+in_trl_1 = input.bool(true, 'Show Trendlines', inline = 'tl_1',group='Trendlines',tooltip = i_10)
+in_trl_2        = input.color(#9598a1, '', inline = 'tl_1',group='Trendlines')
+in_trl_3        = input.color(#9598a1, '', inline = 'tl_1',group='Trendlines')
+in_trl_4      = input.bool(true, 'Extend', inline = 'tl_1',group='Trendlines')
+
+in_trl_5 = input.string(defval = 'Solid', title = "Style", options = ['Solid', 'Dotted', 'Dashed'],inline = "tl_3",group='Trendlines')
+in_trl_6          = input.int(1, 'Width', step = 1, minval = 1,maxval = 4,inline = "tl_3",group='Trendlines')
+
+in_trl_7          = input.int(25, 'Lookback', step = 1, minval = 1, inline ='tl_5',group='Trendlines')
+in_trl_8          = in_trl_7//input.int(20, '/', step = 1, minval = 1, inline ='tl_5',group='Trendlines')
+
+in_trl_9     = not(input.bool(true, 'Show Broken', inline = 'tl_2',group='Trendlines'))
+in_trl_10        = input.color(#9598a1, '', inline = 'tl_2',group='Trendlines')
+in_trl_11        = input.color(#9598a1, '', inline = 'tl_2',group='Trendlines')
+in_trl_12      = input.bool(true, 'Extend', inline = 'tl_2',group='Trendlines')
+
+in_trl_13     = input.bool(false, 'Show Signals', inline = 'tl_s',group='Trendlines')
+in_trl_14        = input.color(color.yellow, '', inline = 'tl_s',group='Trendlines')
+in_trl_15        = input.color(color.yellow, '', inline = 'tl_s',group='Trendlines')
+
+in_trl_16        = input.int(1, 'Max Broken', step = 1, minval = 1, maxval = 50, inline = 'tl_2_B',group='Trendlines')
+in_trl_17        = input.string('Close', 'Mitigation', options = ['Close', 'High/Low'], inline ='tl_2_B',group='Trendlines')
+
+in_trl_18 = input.string(defval = 'Dashed', title = "Style (Broken)", options = ['Solid', 'Dotted', 'Dashed'],inline = "tl_2-1",group='Trendlines')
+in_trl_19         = input.int(1, 'Width', step = 1, minval = 1,maxval = 4,inline = "tl_2-1",group='Trendlines')
+
+in_trl_20= in_trl_5 == 'Solid' ?  line.style_solid : in_trl_5 == 'Dotted' ?  line.style_dotted : line.style_dashed
+in_trl_21= in_trl_18 == 'Solid' ?  line.style_solid : in_trl_18 == 'Dotted' ?  line.style_dotted : line.style_dashed
+
+
+//-----------------------------------------------------------------------------
+// Global Variables
+//-----------------------------------------------------------------------------
+
+color transparent = #ffffff00
+custom_func_1(res) =>
+    t = time(res)
+    not na(t) and (na(t[1]) or t > t[1])
+
+custom_func_2(x, y, txt, css, dashed, down, lbl_size) =>
+    label.new(int(math.avg(x, bar_index)), y, txt, color=transparent, textcolor=css, style=down ? label.style_label_down : label.style_label_up, size=lbl_size)
+    line.new(x, y, bar_index, y, color=css, style=dashed ? line.style_dotted : line.style_solid)
+
+custom_func_3(_cond, _count) =>
+    _barssince = bar_index - ta.valuewhen(_cond, bar_index, _count)
+    _barssince
+
+// Swing Detection/Measurements
+custom_func_4(length) =>
+    var prev = 0
+    prev := high[length] > ta.highest(length) ? 0 : low[length] < ta.lowest(length) ? 1 : prev[1]
+    t = prev == 0 and prev[1] != 0 ? high[length] : 0
+    b = prev == 1 and prev[1] != 1 ? low[length] : 0
+    [t, b]
+
+var variable_ms_1 = 0, var variable_ms_2 = 0
+var variable_ms_3 = 0., var variable_ms_4 = 0, var variable_ms_5 = 0., var variable_ms_6 = 0
+var variable_ms_7 = 0., var variable_ms_8 = 0, var variable_ms_9 = 0., var variable_ms_10 = 0
+var variable_ms_11 = true, var variable_ms_12 = true
+var variable_ms_13 = true, var variable_ms_14 = true
+var variable_ms_15 = high, var variable_ms_16 = low
+var up_trailing_x = 0, var down_trailing_x = 0
+var high_text = "", var low_text = ""
+variable_ms_17 = false
+variable_ms_18 = false
+
+//-----------------------------------------------------------------------------
+// Market Structure
+//-----------------------------------------------------------------------------
+
+variable_ms_19 = "Candle High"
+MSS = true
+
+// Functions
+lineStyle(x) =>
+    switch x
+        "Solid" => line.style_solid
+        "Dashed" => line.style_dashed
+        "Dotted" => line.style_dotted
+variable_ms_20 = ta.pivothigh(high, in_ms_10, in_ms_10)
+variable_ms_21 = ta.pivotlow(low, in_ms_10, in_ms_10)
+
+var float variable_ms_22 = na, var float variable_ms_23 = na, var int variable_ms_24 = na, var int variable_ms_25 = na
+bool variable_ms_26 = false, bool variable_ms_27 = false, bool variable_ms_28 = false, bool variable_ms_29 = false
+
+var int variable_ms_30 = 0
+
+if not na(variable_ms_20)
+    if variable_ms_20 >= variable_ms_22
+        variable_ms_26 := true
+        variable_ms_30 := 2
+    else
+        variable_ms_27 := true
+        variable_ms_30 := 1
+    variable_ms_22 := variable_ms_20
+    variable_ms_24 := bar_index - in_ms_10
+
+if not na(variable_ms_21)
+    if variable_ms_21 >= variable_ms_23
+        variable_ms_28 := true
+        variable_ms_30 := -1
+    else
+        variable_ms_29 := true
+        variable_ms_30 := -2
+    variable_ms_23 := variable_ms_21
+    variable_ms_25 := bar_index - in_ms_10
+
+if variable_ms_26 and in_ms_9
+    label.new(bar_index - in_ms_10, variable_ms_20, "HH", color=CLEAR, style=label.style_label_down, textcolor=in_ms_14, size=in_ms_12)
+if variable_ms_27 and in_ms_9
+    label.new(bar_index - in_ms_10, variable_ms_20, "LH", color=CLEAR, style=label.style_label_down, textcolor=in_ms_14, size=in_ms_12)
+if variable_ms_28 and in_ms_9
+    label.new(bar_index - in_ms_10, variable_ms_21, "HL", color=CLEAR, style=label.style_label_up, textcolor=in_ms_14, size=in_ms_12)
+if variable_ms_29 and in_ms_9
+    label.new(bar_index - in_ms_10, variable_ms_21, "LL", color=CLEAR, style=label.style_label_up, textcolor=in_ms_14, size=in_ms_12)
+
+//-----------------------------------------------------------------------------
+// Fair Value Gaps
+//-----------------------------------------------------------------------------
+
+// Global Data
+var htfH = open
+var htfL = open
+
+if close > htfH
+    htfH := close
+if close < htfL
+    htfL := close
+
+// Security Data, used for HTF Bar Data reference
+sClose = request.security(ticker.standard(syminfo.tickerid), in_fvg_2, close[1], barmerge.gaps_off, barmerge.lookahead_on)
+sHighP2 = request.security(ticker.standard(syminfo.tickerid), in_fvg_2, high[2], barmerge.gaps_off, barmerge.lookahead_on)
+sLowP2 = request.security(ticker.standard(syminfo.tickerid), in_fvg_2, low[2], barmerge.gaps_off, barmerge.lookahead_on)
+sOpen = request.security(ticker.standard(syminfo.tickerid), in_fvg_2, open[1], barmerge.gaps_off, barmerge.lookahead_on)
+sBar = request.security(ticker.standard(syminfo.tickerid), in_fvg_2, bar_index, barmerge.gaps_off, barmerge.lookahead_on)
+
+// Array variables to hold data in memory
+var variable_fvg_1 = array.new_box(0)
+var variable_fvg_2 = array.new_box(0)
+
+var variable_fvg_3 = array.new_box(0)
+var variable_fvg_4 = array.new_box(0)
+
+var variable_fvg_5 = array.new_line(0)
+var variable_fvg_6 = array.new_line(0)
+var variable_fvg_7 = array.new_line(0)
+var variable_fvg_8 = array.new_line(0)
+var variable_fvg_9 = array.new_line(0)
+var variable_fvg_10 = array.new_line(0)
+var variable_fvg_11 = array.new_label(0)
+var variable_fvg_12 = array.new_label(0)
+var variable_fvg_13 = color.new(color.white, 100)
+
+var variable_fvg_14 = false
+var variable_fvg_15 = false
+
+variable_fvg_14 := false
+variable_fvg_15 := false
+
+// Functions
+custom_func_5(_upperlimit, _lowerlimit, _midlimit, _bar, _boxholder, _boxholder_fill, _midholder, _highholder, _lowholder, _labelholder, _boxcolor, _mtfboxcolor, _htf, line_color_mid) =>
+    variable_fvg_16 = str.tostring(in_fvg_2)
+    offset = var_fvg_8
+    variable_fvg_17 = _mtfboxcolor
+    bg_color = color.new(_mtfboxcolor, in_fvg_op)
+    if _htf == false
+        variable_fvg_16 := str.tostring(timeframe.period)
+        offset := var_fvg_7
+        variable_fvg_17 := _boxcolor
+    array.push(_boxholder, box.new(_bar, _upperlimit, _bar + (var_ob_13) * in_fvg_9, _lowerlimit, border_color=in_fvg_6 ? bg_color : na, bgcolor=in_fvg_6 ? bg_color : na, extend=in_fvg_10 ? extend.right : extend.none, xloc=xloc.bar_time, text="", text_color=#787b86, text_halign=text.align_right, text_size=size.small))
+    array.push(_boxholder_fill, box.new(_bar, _upperlimit, _bar + (var_ob_13) * in_fvg_9, _lowerlimit, border_color=in_fvg_6 ? bg_color : na, bgcolor=in_fvg_6 ? bg_color : na, extend=in_fvg_10 ? extend.right : extend.none, xloc=xloc.bar_time))
+    array.push(_midholder, line.new(_bar, (_lowerlimit + _upperlimit) / 2.0, _bar + (var_ob_13) * in_fvg_9, _midlimit, color=mid_line_show == "On" ? line_color_mid : #363a4500, extend=in_fvg_10 ? extend.right : extend.none, style=lineStyle(in_fvg_13), width=in_fvg_16, xloc=xloc.bar_time))
+    array.push(_lowholder, line.new(_bar, _lowerlimit, _bar + (var_ob_13) * in_fvg_9, _lowerlimit, color=var_fvg_3 ? variable_fvg_17 : na, extend=in_fvg_10 ? extend.right : extend.none, width=1, xloc=xloc.bar_time))
+    array.push(_highholder, line.new(_bar, _upperlimit, _bar + (var_ob_13) * in_fvg_9, _upperlimit, color=var_fvg_3 ? variable_fvg_17 : na, extend=in_fvg_10 ? extend.right : extend.none, width=1, xloc=xloc.bar_time))
+
+// Checks for gap between current candle and 2 previous candle (Fair Value Gap)
+custom_func_6(_close, _high, _highp2, _low, _lowp2, _open, _bar, _htf) =>
+    gap = 0
+    thold_ = (ta.highest(_high, 300) - ta.lowest(_low, 300)) * math.max(in_fvg_3, 0.1) / 100.
+    if _open > _close  // Red candle
+        if _lowp2 > _high
+            if not (in_fvg_4) or math.abs(_lowp2 - _high) > thold_
+                upperlimit = _high
+                lowerlimit = _lowp2
+                midlimit = lowerlimit + ((upperlimit - lowerlimit) / 2.)
+                gap := 1
+                if in_fvg_1
+                    custom_func_5(upperlimit, lowerlimit, midlimit, _bar, variable_fvg_1, variable_fvg_3, variable_fvg_9, variable_fvg_5, variable_fvg_7, variable_fvg_11, var_fvg_1, in_fvg_12, _htf,in_fvg_14_2)
+    else
+        if _low > _highp2
+            if not (in_fvg_4) or math.abs(_low - _highp2) > thold_
+                upperlimit = _low
+                lowerlimit = _highp2
+                midlimit = lowerlimit + ((upperlimit - lowerlimit) / 2.)
+                gap := -1
+                if in_fvg_1
+                    custom_func_5(upperlimit, lowerlimit, midlimit, _bar, variable_fvg_2, variable_fvg_4, variable_fvg_10, variable_fvg_6, variable_fvg_8, variable_fvg_12, var_fvg_2, in_fvg_11, _htf,in_fvg_14)
+    gap
+
+// Removes the gap from its relevant array if it has been filled
+custom_func_7(_currentgap, _currentgap_fill, _i, _boxholder, _boxholder_fill, _midholder, _highholder, _lowholder, _labelholder) =>
+    array.remove(_boxholder, _i)
+    array.remove(_boxholder_fill, _i)
+    currentmid = array.get(_midholder, _i)
+    currenthigh = array.get(_highholder, _i)
+    currentlow = array.get(_lowholder, _i)
+    array.remove(_midholder, _i)
+    array.remove(_highholder, _i)
+    array.remove(_lowholder, _i)
+    if var_fvg_4
+        line.delete(currentmid)
+        line.delete(currenthigh)
+        line.delete(currentlow)
+    else
+        line.set_extend(currentmid, extend.none)
+        line.set_x2(currentmid, time)
+        line.set_extend(currenthigh, extend.none)
+        line.set_x2(currenthigh, time)
+        line.set_extend(currentlow, extend.none)
+        line.set_x2(currentlow, time)
+    if var_fvg_4
+        box.delete(_currentgap)
+        box.delete(_currentgap_fill)
+    else
+        box.set_extend(_currentgap, extend.none)
+        box.set_right(_currentgap, time)
+
+// Checks if gap has been filled either by 0.5 fill (var_fvg_3) or SHRINKS the gap to reflect the true value gap left
+custom_func_8(_high, _low) =>
+    variable_fvg_19 = 0
+    if array.size(variable_fvg_1) > 0
+        for i = array.size(variable_fvg_1) - 1 to 0
+            if in_fvg_15
+                currentgap_fill = array.get(variable_fvg_3, i)
+                currentgap = array.get(variable_fvg_1, i)
+                cmid = array.get(variable_fvg_9, i)
+                chigh = array.get(variable_fvg_5, i)
+                clow = array.get(variable_fvg_7, i)
+                line.set_x2(cmid, timenow + (var_ob_13) * in_fvg_9)
+                line.set_x2(chigh, timenow + (var_ob_13) * in_fvg_9)
+                line.set_x2(clow, timenow + (var_ob_13) * in_fvg_9)
+                box.set_right(currentgap_fill, timenow + (var_ob_13) * in_fvg_9)
+                box.set_right(currentgap, timenow + (var_ob_13) * in_fvg_9)
+            if in_fvg_5 == "Touch"
+                currentgap_fill = array.get(variable_fvg_3, i)
+                currentgap = array.get(variable_fvg_1, i)
+                currentmid = array.get(variable_fvg_9, i)
+                currenthigh = array.get(variable_fvg_5, i)
+                currentlow = array.get(variable_fvg_7, i)
+                currenttop = box.get_top(currentgap)
+                if high > currenttop
+                    variable_fvg_19 := 1
+                    custom_func_7(currentgap, currentgap_fill, i, variable_fvg_1, variable_fvg_3, variable_fvg_9, variable_fvg_5, variable_fvg_7, variable_fvg_11)
+            if in_fvg_5 == "Wicks"
+                currentgap_fill = array.get(variable_fvg_3, i)
+                currentgap = array.get(variable_fvg_1, i)
+                currentmid = array.get(variable_fvg_9, i)
+                currenthigh = array.get(variable_fvg_5, i)
+                currentlow = array.get(variable_fvg_7, i)
+                currenttop = box.get_bottom(currentgap)
+                currentbottom = box.get_top(currentgap_fill)
+                if high > currentbottom and in_fvg_7
+                    currentgap_f = array.get(variable_fvg_3, i)
+                    cur_bottom = box.get_bottom(currentgap_f)
+                    _bottom = box.get_bottom(currentgap)
+                    if _bottom == cur_bottom
+                        box.set_bottom(currentgap_f, high)
+                    else
+                        box.set_bottom(currentgap_f, math.max(cur_bottom, high))
+                    box.set_bgcolor(currentgap_f, #787b865e)
+                if high > currenttop
+                    variable_fvg_19 := 1
+                    custom_func_7(currentgap, currentgap_fill, i, variable_fvg_1, variable_fvg_3, variable_fvg_9, variable_fvg_5, variable_fvg_7, variable_fvg_11)
+            if in_fvg_5 == "Close"
+                currentgap_fill = array.get(variable_fvg_3, i)
+                currentgap = array.get(variable_fvg_1, i)
+                currentmid = array.get(variable_fvg_9, i)
+                currenthigh = array.get(variable_fvg_5, i)
+                currentlow = array.get(variable_fvg_7, i)
+                currenttop = box.get_bottom(currentgap)
+                currentbottom = box.get_top(currentgap_fill)
+                if high > currentbottom and in_fvg_7
+                    currentgap_f = array.get(variable_fvg_3, i)
+                    cur_bottom = box.get_bottom(currentgap_f)
+                    _bottom = box.get_bottom(currentgap)
+                    if _bottom == cur_bottom
+                        box.set_bottom(currentgap_f, high)
+                    else
+                        box.set_bottom(currentgap_f, math.max(cur_bottom, high))
+                    box.set_bgcolor(currentgap_f, #787b865e)
+                if close > currenttop
+                    variable_fvg_19 := 1
+                    custom_func_7(currentgap, currentgap_fill, i, variable_fvg_1, variable_fvg_3, variable_fvg_9, variable_fvg_5, variable_fvg_7, variable_fvg_11)
+            if in_fvg_5 == "Average"
+                currentgap_fill = array.get(variable_fvg_3, i)
+                currentgap = array.get(variable_fvg_1, i)
+                currentmid = array.get(variable_fvg_9, i)
+                currenttop = line.get_y1(currentmid)
+                currentbottom = box.get_top(currentgap_fill)
+                if high > currentbottom and in_fvg_7
+                    currentgap_f = array.get(variable_fvg_3, i)
+                    cur_bottom = box.get_bottom(currentgap_f)
+                    _bottom = box.get_bottom(currentgap)
+                    if _bottom == cur_bottom
+                        box.set_bottom(currentgap_f, high)
+                    else
+                        box.set_bottom(currentgap_f, math.max(cur_bottom, high))
+                    box.set_bgcolor(currentgap_f, #787b865e)
+                if high > currenttop
+                    variable_fvg_19 := 1
+                    custom_func_7(currentgap, currentgap_fill, i, variable_fvg_1, variable_fvg_3, variable_fvg_9, variable_fvg_5, variable_fvg_7, variable_fvg_11)
+    if array.size(variable_fvg_2) > 0
+        for i = array.size(variable_fvg_2) - 1 to 0
+            if in_fvg_15
+                currentgap_fill = array.get(variable_fvg_4, i)
+                currentgap = array.get(variable_fvg_2, i)
+                cmid = array.get(variable_fvg_10, i)
+                chigh = array.get(variable_fvg_6, i)
+                clow = array.get(variable_fvg_8, i)
+                line.set_x2(cmid, timenow + (var_ob_13) * in_fvg_9)
+                line.set_x2(chigh, timenow + (var_ob_13) * in_fvg_9)
+                line.set_x2(clow, timenow + (var_ob_13) * in_fvg_9)
+                box.set_right(currentgap_fill, timenow + (var_ob_13) * in_fvg_9)
+                box.set_right(currentgap, timenow + (var_ob_13) * in_fvg_9)
+            if in_fvg_5 == "Touch"
+                currentgap_fill = array.get(variable_fvg_4, i)
+                currentgap = array.get(variable_fvg_2, i)
+                currenttop = box.get_top(currentgap)
+                currentmid = array.get(variable_fvg_10, i)
+                currenthigh = array.get(variable_fvg_6, i)
+                currentlow = array.get(variable_fvg_8, i)
+                if low < currenttop
+                    variable_fvg_19 := -1
+                    custom_func_7(currentgap, currentgap_fill, i, variable_fvg_2, variable_fvg_4, variable_fvg_10, variable_fvg_6, variable_fvg_8, variable_fvg_12)
+            if in_fvg_5 == "Wicks"
+                currentgap_fill = array.get(variable_fvg_4, i)
+                currentgap = array.get(variable_fvg_2, i)
+                currenttop = box.get_bottom(currentgap)
+                currentmid = array.get(variable_fvg_10, i)
+                currenthigh = array.get(variable_fvg_6, i)
+                currentlow = array.get(variable_fvg_8, i)
+                currentbottom = box.get_top(currentgap_fill)
+                if low < currentbottom and in_fvg_7
+                    currentgap_f = array.get(variable_fvg_4, i)
+                    cur_bottom = box.get_bottom(currentgap_f)
+                    _bottom = box.get_bottom(currentgap)
+                    if _bottom == cur_bottom
+                        box.set_bottom(currentgap_f, low)
+                    else
+                        box.set_bottom(currentgap_f, math.min(cur_bottom, low))
+                    box.set_bgcolor(currentgap_f, #787b865e)
+                if low < currenttop
+                    variable_fvg_19 := -1
+                    custom_func_7(currentgap, currentgap_fill, i, variable_fvg_2, variable_fvg_4, variable_fvg_10, variable_fvg_6, variable_fvg_8, variable_fvg_12)
+            if in_fvg_5 == "Close"
+                currentgap_fill = array.get(variable_fvg_4, i)
+                currentgap = array.get(variable_fvg_2, i)
+                currenttop = box.get_bottom(currentgap)
+                currentmid = array.get(variable_fvg_10, i)
+                currenthigh = array.get(variable_fvg_6, i)
+                currentlow = array.get(variable_fvg_8, i)
+                currentbottom = box.get_top(currentgap_fill)
+                if low < currentbottom and in_fvg_7
+                    currentgap_f = array.get(variable_fvg_4, i)
+                    cur_bottom = box.get_bottom(currentgap_f)
+                    _bottom = box.get_bottom(currentgap)
+                    if _bottom == cur_bottom
+                        box.set_bottom(currentgap_f, low)
+                    else
+                        box.set_bottom(currentgap_f, math.min(cur_bottom, low))
+                    box.set_bgcolor(currentgap_f, #787b865e)
+                if close < currenttop
+                    variable_fvg_19 := -1
+                    custom_func_7(currentgap, currentgap_fill, i, variable_fvg_2, variable_fvg_4, variable_fvg_10, variable_fvg_6, variable_fvg_8, variable_fvg_12)
+            if in_fvg_5 == "Average"
+                currentgap_fill = array.get(variable_fvg_4, i)
+                currentgap = array.get(variable_fvg_2, i)
+                currentmid = array.get(variable_fvg_10, i)
+                currenttop = line.get_y1(currentmid)
+                currenthigh = array.get(variable_fvg_6, i)
+                currentlow = array.get(variable_fvg_8, i)
+                currentbottom = box.get_top(currentgap_fill)
+                if low < currentbottom and in_fvg_7
+                    currentgap_f = array.get(variable_fvg_4, i)
+                    cur_bottom = box.get_bottom(currentgap_f)
+                    _bottom = box.get_bottom(currentgap)
+                    if _bottom == cur_bottom
+                        box.set_bottom(currentgap_f, low)
+                    else
+                        box.set_bottom(currentgap_f, math.min(cur_bottom, low))
+                    box.set_bgcolor(currentgap_f, #787b865e)
+                if low < currenttop
+                    variable_fvg_19 := -1
+                    custom_func_7(currentgap, currentgap_fill, i, variable_fvg_2, variable_fvg_4, variable_fvg_10, variable_fvg_6, variable_fvg_8, variable_fvg_12)
+    variable_fvg_19
+
+// Pine provided function to determine a new bar
+if custom_func_1(in_fvg_2)
+    htfH := high
+    htfL := low
+
+variable_fvg_18 = 0
+
+// User Input, allow MTF data calculations
+if custom_func_1(in_fvg_2) and (var_fvg_6 == "Current + HTF" or var_fvg_6 == "HTF") and barstate.isconfirmed
+    variable_fvg_18 := custom_func_6(sClose, htfH, sHighP2, htfL, sLowP2, sOpen, time[2], true)
+
+alertcondition(variable_fvg_18 == 1 or variable_fvg_18 == -1, "Bullish FVG", "Bullish FVG Found Ez-SMC")
+
+variable_fvg_19 = custom_func_8(high, low)
+
+alertcondition(variable_fvg_19 == 1 or variable_fvg_19 == -1, "Fair Value Gap Break", "FVG Broken Ez-SMC")
+
+if array.size(variable_fvg_1) > in_fvg_8
+    d_box = array.shift(variable_fvg_1)
+    box.delete(d_box)
+
+if array.size(variable_fvg_3) > in_fvg_8
+    d_box = array.shift(variable_fvg_3)
+    box.delete(d_box)
+
+if array.size(variable_fvg_9) > in_fvg_8
+    d_line = array.shift(variable_fvg_9)
+    line.delete(d_line)
+
+if array.size(variable_fvg_5) > in_fvg_8
+    d_line = array.shift(variable_fvg_5)
+    line.delete(d_line)
+
+if array.size(variable_fvg_7) > in_fvg_8
+    d_line = array.shift(variable_fvg_7)
+    line.delete(d_line)
+
+if array.size(variable_fvg_2) > in_fvg_8
+    d_box_ = array.shift(variable_fvg_2)
+    box.delete(d_box_)
+
+if array.size(variable_fvg_4) > in_fvg_8
+    d_box_ = array.shift(variable_fvg_4)
+    box.delete(d_box_)
+
+if array.size(variable_fvg_10) > in_fvg_8
+    d_line_ = array.shift(variable_fvg_10)
+    line.delete(d_line_)
+
+if array.size(variable_fvg_6) > in_fvg_8
+    d_line_ = array.shift(variable_fvg_6)
+    line.delete(d_line_)
+
+if array.size(variable_fvg_8) > in_fvg_8
+    d_line_ = array.shift(variable_fvg_8)
+    line.delete(d_line_)
+
+n = bar_index
+
+//-----------------------------------------------------------------------------
+// Liquidity Levels
+//-----------------------------------------------------------------------------
+
+highLineColor = in_liq_12
+lowLineColor = in_liq_11
+highBoxBgColor = in_liq_12
+highBoxBorderColor = in_liq_15
+lowBoxBgColor = in_liq_11
+lowBoxBorderColor = in_liq_16
+atr_liq = ta.atr(300)
+
+float thold_liq = atr_liq * (in_liq_10 / 10)
+
+// Functions
+custom_func_9(tf) =>
+    ts = timeframe.in_seconds("")
+    htfs = timeframe.in_seconds(tf)
+    htfs / ts
+
+custom_func_10(_array) =>
+    if array.size(_array) > in_liq_6 / 2
+        a = array.shift(_array)
+        line.delete(a)
+
+custom_func_11(_array) =>
+    if array.size(_array) > in_liq_6 / 2
+        a = array.shift(_array)
+        box.delete(a)
+
+custom_func_12(_array, _hl) =>
+    m = false
+    if array.size(_array) > 0
+        for i = array.size(_array) - 1 to 0 by 1
+            l = array.get(_array, i)
+            hh = in_liq_5 == "Close" ? close[1] : high
+            ll = in_liq_5 == "Close" ? close[1] : low
+            if _hl == "High" and hh > line.get_y1(l)
+                array.remove(_array, i)
+                if in_liq_4 == "Show"// and in_liq_17 == "Lines"
+                    line.new(line.get_x1(l), line.get_y1(l), time, line.get_y1(l), xloc=xloc.bar_time, color=in_liq_12, style=line.style_dotted, width=in_liq_18)
+                line.delete(l)
+                m := true
+            if _hl == "Low" and ll < line.get_y1(l)
+                array.remove(_array, i)
+                if in_liq_4 == "Show"// and in_liq_17 == "Lines"
+                    line.new(line.get_x1(l), line.get_y1(l), time, line.get_y1(l), xloc=xloc.bar_time, color=in_liq_11, style=line.style_dotted, width=in_liq_18)
+                line.delete(l)
+                m := true
+    custom_func_10(_array)
+    m
+
+custom_func_13(_array, _hl) =>
+    m = false
+    if array.size(_array) > 0
+        for i = array.size(_array) - 1 to 0 by 1
+            l = array.get(_array, i)
+            hh = in_liq_5 == "Close" ? close[1] : high
+            ll = in_liq_5 == "Close" ? close[1] : low
+            if _hl == "High" and hh > box.get_top(l)
+                array.remove(_array, i)
+                if in_liq_4 == "Show" and in_liq_17 == "Boxes"
+                    box.new(box.get_left(l), box.get_top(l), time, box.get_bottom(l), xloc=xloc.bar_time, bgcolor=color.new(highBoxBgColor, 90), border_color=color.new(highBoxBorderColor, 90), border_style=line.style_dotted)
+                box.delete(l)
+                m := true
+            if _hl == "Low" and ll < box.get_top(l)
+                array.remove(_array, i)
+                if in_liq_4 == "Show" and in_liq_17 == "Boxes"
+                    box.new(box.get_left(l), box.get_top(l), time, box.get_bottom(l), xloc=xloc.bar_time, bgcolor=color.new(lowBoxBgColor, 90), border_color=color.new(lowBoxBorderColor, 90), border_style=line.style_dotted)
+                box.delete(l)
+                m := true
+    custom_func_11(_array)
+    m
+
+custom_func_14(lineArray) =>
+    if array.size(lineArray) > 0
+        for i = array.size(lineArray) - 1 to 0 by 1
+            l = array.get(lineArray, i)
+            timeExt = timenow + ((var_ob_13) * in_liq_7)
+            line.set_x2(l, timeExt)
+
+custom_func_15(boxArray) =>
+    if array.size(boxArray) > 0
+        for i = array.size(boxArray) - 1 to 0 by 1
+            b = array.get(boxArray, i)
+            timeExt = timenow + ((var_ob_13) * in_liq_7)
+            box.set_right(b, timeExt)
+
+// Higher TimeFrame
+// Variables
+var highLineArrayHTF = array.new_line()
+var lowLineArrayHTF = array.new_line()
+
+// Boxes
+var highBoxArrayHTF = array.new_box()
+var lowBoxArrayHTF = array.new_box()
+
+// Get HTF
+[_index_time, _open, _high, _low, _close] = request.security(syminfo.tickerid, in_liq_2, [time, open, high, low, close])
+
+// Pivots
+pivotHighHTF = ta.pivothigh(_high, in_liq_3 * custom_func_9(in_liq_2), in_liq_3 + custom_func_9(in_liq_2))
+pivotLowHTF = ta.pivotlow(_low, in_liq_3 * custom_func_9(in_liq_2), in_liq_3 + custom_func_9(in_liq_2))
+
+if in_liq_1
+    timeExt = time + ((time[1] - time[2]) * 10)
+    dis = in_liq_3 + custom_func_9(in_liq_2)
+    if pivotHighHTF
+        text_liq = in_liq_13 ? "BSL": " "
+        if in_liq_17 == "Lines"
+            array.push(highLineArrayHTF, line.new(_index_time[dis], _high[dis], _index_time[+1], _high[dis], color=in_liq_12, style=in_liq_9, xloc=xloc.bar_time, extend=in_liq_19 ? extend.right : extend.none, width=in_liq_18))
+
+            y1 = _high[dis] + thold_liq*2
+            y2 = _high[dis]
+            array.push(highBoxArrayHTF, box.new(_index_time[dis], y2, _index_time[+1], y1, bgcolor=#00000000, border_color=#00000000, xloc=xloc.bar_time, border_style=in_liq_9, extend=in_liq_19 ? extend.right : extend.none, border_width=in_liq_18, text=text_liq, text_halign=text.align_right, text_color=in_liq_14_2, text_size=size.small))
+
+        else
+            y1 = _high[dis]
+            y2 = _high[dis] - thold_liq
+            array.push(highBoxArrayHTF, box.new(_index_time[dis], y2, _index_time[+1], y1, bgcolor=in_liq_12, border_color=in_liq_12, xloc=xloc.bar_time, border_style=in_liq_9, extend=in_liq_19 ? extend.right : extend.none, border_width=in_liq_18, text=text_liq, text_halign=text.align_right, text_color=in_liq_14_2, text_size=size.small))
+
+    if pivotLowHTF
+        text_liq = in_liq_13 ? "SSL": " "
+        if in_liq_17 == "Lines"
+            array.push(lowLineArrayHTF, line.new(_index_time[dis], _low[dis], _index_time[+1], _low[dis], color=in_liq_11, style=in_liq_9, xloc=xloc.bar_time, extend=in_liq_19 ? extend.right : extend.none, width=in_liq_18))
+
+            y1 = _low[dis]
+            y2 = _low[dis] - thold_liq*2
+            array.push(lowBoxArrayHTF, box.new(_index_time[dis], y2, _index_time[+1], y1, bgcolor=#00000000, border_color=#00000000, xloc=xloc.bar_time, border_style=in_liq_9, extend=in_liq_19 ? extend.right : extend.none, border_width=in_liq_18, text=text_liq, text_halign=text.align_right, text_color=in_liq_14, text_size=size.small))
+
+        else
+            y1 = _low[dis] + thold_liq
+            y2 = _low[dis]
+            array.push(lowBoxArrayHTF, box.new(_index_time[dis], y2, _index_time[+1], y1, bgcolor=in_liq_11, border_color=in_liq_11, xloc=xloc.bar_time, border_style=in_liq_9, extend=in_liq_19 ? extend.right : extend.none, border_width=in_liq_18, text=text_liq, text_halign=text.align_right, text_color=in_liq_14, text_size=size.small))
+
+
+// Run Functions
+highLineAlertHTF = custom_func_12(highLineArrayHTF, "High")
+lowLineAlertHTF = custom_func_12(lowLineArrayHTF, "Low")
+highBoxAlertHTF = custom_func_13(highBoxArrayHTF, "High")
+lowBoxAlertHTF = custom_func_13(lowBoxArrayHTF, "Low")
+
+custom_func_14(highLineArrayHTF)
+custom_func_14(lowLineArrayHTF)
+custom_func_15(highBoxArrayHTF)
+custom_func_15(lowBoxArrayHTF)
+
+// Alerts
+alertcondition(pivotHighHTF or pivotLowHTF, "Liquidity Level", "Liquidity Level Found Ez-SMC")
+alertcondition(highLineAlertHTF or highBoxAlertHTF or lowLineAlertHTF or lowBoxAlertHTF, "Liquidity Level Break", "Liquidity Level Broken Ez-SMC")
+
+//-----------------------------------------------------------------------------
+// Key Levels
+//-----------------------------------------------------------------------------
+
+var var_klvl_1 = time
+var var_klvl_2 = high
+var var_klvl_3 = low
+
+var_klvl_4 = request.security(syminfo.tickerid, "D", high, lookahead=barmerge.lookahead_on)
+var_klvl_5 = request.security(syminfo.tickerid, "D", low, lookahead=barmerge.lookahead_on)
+[var_klvl_6, var_klvl_7] = request.security(syminfo.tickerid, "D", [time, open], lookahead=barmerge.lookahead_on)
+[var_klvl_8, var_klvl_9] = request.security(syminfo.tickerid, "D", [time[1], high[1]], lookahead=barmerge.lookahead_on)
+[var_klvl_10, var_klvl_11] = request.security(syminfo.tickerid, "D", [time[1], low[1]], lookahead=barmerge.lookahead_on)
+[var_klvl_12, var_klvl_13] = request.security(syminfo.tickerid, "W", [time, open], lookahead=barmerge.lookahead_on)
+[var_klvl_14, var_klvl_15] = request.security(syminfo.tickerid, "W", [time[1], high[1]], lookahead=barmerge.lookahead_on)
+[var_klvl_16, var_klvl_17] = request.security(syminfo.tickerid, "W", [time[1], low[1]], lookahead=barmerge.lookahead_on)
+[var_klvl_18, var_klvl_19] = request.security(syminfo.tickerid, "M", [time, open], lookahead=barmerge.lookahead_on)
+[var_klvl_20, var_klvl_21] = request.security(syminfo.tickerid, "M", [time[1], high[1]], lookahead=barmerge.lookahead_on)
+[var_klvl_22, var_klvl_23] = request.security(syminfo.tickerid, "M", [time[1], low[1]], lookahead=barmerge.lookahead_on)
+[var_klvl_24, var_klvl_25] = request.security(syminfo.tickerid, "240", [time, open], lookahead=barmerge.lookahead_on)
+[var_klvl_26, var_klvl_27] = request.security(syminfo.tickerid, "240", [time[1], high[1]], lookahead=barmerge.lookahead_on)
+[var_klvl_28, var_klvl_29] = request.security(syminfo.tickerid, "240", [time[1], low[1]], lookahead=barmerge.lookahead_on)
+[var_klvl_30, var_klvl_31] = request.security(syminfo.tickerid, "3M", [time, open], lookahead=barmerge.lookahead_on)
+[var_klvl_32, var_klvl_33] = request.security(syminfo.tickerid, "3M", [time[1], high[1]], lookahead=barmerge.lookahead_on)
+[var_klvl_34, var_klvl_35] = request.security(syminfo.tickerid, "3M", [time[1], low[1]], lookahead=barmerge.lookahead_on)
+[var_klvl_36, var_klvl_37] = request.security(syminfo.tickerid, "12M", [time, open], lookahead=barmerge.lookahead_on)
+[var_klvl_38, var_klvl_39] = request.security(syminfo.tickerid, "12M", [time, high], lookahead=barmerge.lookahead_on)
+[var_klvl_40, var_klvl_41] = request.security(syminfo.tickerid, "12M", [time, low], lookahead=barmerge.lookahead_on)
+
+if var_klvl_12 != var_klvl_12[1]
+    var_kl_31 := false
+    var_kl_31
+
+if in_kl_9 == true and var_kl_31 == false
+    var_kl_31 := true
+    var_klvl_1 := var_klvl_6
+    var_klvl_2 := var_klvl_4
+    var_klvl_3 := var_klvl_5
+    var_klvl_3
+
+linewidthint = 1
+if linesize == "Small"
+    linewidthint := 1
+    linewidthint
+if linesize == "Medium"
+    linewidthint := 2
+    linewidthint
+if linesize == "Large"
+    linewidthint := 3
+    linewidthint
+
+var linewidth_def = linewidthint
+fontsize = size.small
+
+if in_kl_29 == "Small"
+    fontsize := size.small
+    fontsize
+if in_kl_29 == "Medium"
+    fontsize := size.normal
+    fontsize
+if in_kl_29 == "Large"
+    fontsize := size.large
+    fontsize
+
+linestyles = line.style_solid
+if linestyle == "Dashed"
+    linestyles := line.style_dashed
+    linestyles
+if linestyle == "Dotted"
+    linestyles := line.style_dotted
+    linestyles
+
+var DEFAULT_LABEL_SIZE = fontsize
+var DEFAULT_LABEL_STYLE = label.style_label_left
+var Rigth_Def = var_kl_29
+var arr_price = array.new_float(0)
+var arr_label = array.new_label(0)
+
+Combine_Levels(arr_price, arr_label, currentprice, currentlabel, currentcolor) =>
+    if array.includes(arr_price, currentprice)
+        whichindex = array.indexof(arr_price, currentprice)
+        labelhold = array.get(arr_label, whichindex)
+        whichtext = label.get_text(labelhold)
+        label.set_text(labelhold, label.get_text(currentlabel) + " / " + whichtext)
+        label.set_text(currentlabel, "")
+        label.set_textcolor(labelhold, currentcolor)
+    else
+        array.push(arr_price, currentprice)
+        array.push(arr_label, currentlabel)
+
+extend_to_current(bars) =>
+    timenow + (time - time[1]) * bars
+
+if barstate.islast
+    arr_price := array.new_float(0)
+    arr_label := array.new_label(0)
+    if in_kl_1
+        var_lvl_1 = extend_to_current(Rigth_Def)
+        var_lvl_2 = extend_to_current(Rigth_Def)
+        var_lvl_3 = extend_to_current(Rigth_Def)
+        var var_lvl_4 = line.new(x1=var_klvl_24, x2=var_lvl_1, y1=var_klvl_25, y2=var_klvl_25, color=in_kl_2, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_3))
+        var var_lvl_5 = label.new(x=var_lvl_1, y=var_klvl_25, text=var_kl_23, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_2, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_lvl_6 = line.new(x1=var_klvl_26, x2=var_lvl_2, y1=var_klvl_27, y2=var_klvl_27, color=in_kl_2, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_3))
+        var var_lvl_7 = label.new(x=var_lvl_2, y=var_klvl_27, text=var_kl_21, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_2, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_lvl_8 = line.new(x1=var_klvl_28, x2=var_lvl_3, y1=var_klvl_29, y2=var_klvl_29, color=in_kl_2, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_3))
+        var var_lvl_9 = label.new(x=var_lvl_3, y=var_klvl_29, text=var_kl_22, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_2, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        label.set_text(var_lvl_5, var_kl_23)
+        line.set_xy1(var_lvl_4, var_klvl_24, var_klvl_25)
+        line.set_xy2(var_lvl_4, var_lvl_1, var_klvl_25)
+        label.set_xy(var_lvl_5, var_lvl_1, var_klvl_25)
+        line.set_xy1(var_lvl_6, var_klvl_26, var_klvl_27)
+        line.set_xy2(var_lvl_6, var_lvl_2, var_klvl_27)
+        label.set_xy(var_lvl_7, var_lvl_2, var_klvl_27)
+        label.set_text(var_lvl_7, var_kl_21)
+        line.set_x1(var_lvl_8, var_klvl_28)
+        line.set_x2(var_lvl_8, var_lvl_3)
+        line.set_y1(var_lvl_8, var_klvl_29)
+        line.set_y2(var_lvl_8, var_klvl_29)
+        label.set_x(var_lvl_9, var_lvl_3)
+        label.set_y(var_lvl_9, var_klvl_29)
+        label.set_text(var_lvl_9, var_kl_22)
+        Combine_Levels(arr_price, arr_label, var_klvl_25, var_lvl_5, in_kl_2)
+        Combine_Levels(arr_price, arr_label, var_klvl_27, var_lvl_7, in_kl_2)
+        Combine_Levels(arr_price, arr_label, var_klvl_29, var_lvl_9, in_kl_2)
+    if in_kl_9
+        var_lvl_10 = extend_to_current(Rigth_Def)
+        var_lvl_11 = extend_to_current(Rigth_Def)
+        var_lvl_12 = (var_klvl_2 + var_klvl_3) / 2
+        var var_lvl_13 = line.new(x1=var_klvl_1, x2=var_lvl_10, y1=var_klvl_2, y2=var_klvl_2, color=in_kl_10, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_11))
+        var var_lvl_14 = label.new(x=var_lvl_10, y=var_klvl_2, text=var_kl_25, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_10, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_lvl_15 = line.new(x1=var_klvl_1, x2=var_lvl_11, y1=var_lvl_12, y2=var_lvl_12, color=in_kl_10, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_11))
+        var var_lvl_16 = label.new(x=var_lvl_11, y=var_lvl_12, text=var_kl_27, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_10, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_lvl_17 = line.new(x1=var_klvl_1, x2=var_lvl_10, y1=var_klvl_3, y2=var_klvl_3, color=in_kl_10, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_11))
+        var var_lvl_18 = label.new(x=var_lvl_10, y=var_klvl_3, text=var_kl_26, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_10, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        line.set_x1(var_lvl_13, var_klvl_1)
+        line.set_x2(var_lvl_13, var_lvl_10)
+        line.set_y1(var_lvl_13, var_klvl_2)
+        line.set_y2(var_lvl_13, var_klvl_2)
+        label.set_x(var_lvl_14, var_lvl_10)
+        label.set_y(var_lvl_14, var_klvl_2)
+        label.set_text(var_lvl_14, var_kl_25)
+        line.set_x1(var_lvl_17, var_klvl_1)
+        line.set_x2(var_lvl_17, var_lvl_10)
+        line.set_y1(var_lvl_17, var_klvl_3)
+        line.set_y2(var_lvl_17, var_klvl_3)
+        label.set_x(var_lvl_18, var_lvl_10)
+        label.set_y(var_lvl_18, var_klvl_3)
+        label.set_text(var_lvl_18, var_kl_26)
+        line.set_x1(var_lvl_15, var_klvl_1)
+        line.set_x2(var_lvl_15, var_lvl_11)
+        line.set_y1(var_lvl_15, var_lvl_12)
+        line.set_y2(var_lvl_15, var_lvl_12)
+        label.set_x(var_lvl_16, var_lvl_11)
+        label.set_y(var_lvl_16, var_lvl_12)
+        label.set_text(var_lvl_16, var_kl_27)
+        Combine_Levels(arr_price, arr_label, var_klvl_2, var_lvl_14, in_kl_10)
+        Combine_Levels(arr_price, arr_label, var_klvl_3, var_lvl_18, in_kl_10)
+        Combine_Levels(arr_price, arr_label, var_lvl_12, var_lvl_16, in_kl_10)
+    if in_kl_5
+        var_lvl_19 = extend_to_current(Rigth_Def)
+        var_lvl_20 = extend_to_current(Rigth_Def)
+        var_lvl_21 = extend_to_current(Rigth_Def)
+        var var_lvl_22 = line.new(x1=var_klvl_6, x2=var_lvl_19, y1=var_klvl_7, y2=var_klvl_7, color=in_kl_6, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_7))
+        var var_lvl_23 = label.new(x=var_lvl_19, y=var_klvl_7, text=var_kl_3, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_6, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_lvl_24 = line.new(x1=var_klvl_8, x2=var_lvl_20, y1=var_klvl_9, y2=var_klvl_9, color=in_kl_6, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_7))
+        var var_lvl_25 = label.new(x=var_lvl_20, y=var_klvl_9, text=var_kl_1, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_6, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_lvl_26 = line.new(x1=var_klvl_10, x2=var_lvl_21, y1=var_klvl_11, y2=var_klvl_11, color=in_kl_6, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_7))
+        var var_lvl_27 = label.new(x=var_lvl_21, y=var_klvl_11, text=var_kl_2, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_6, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        line.set_x1(var_lvl_22, var_klvl_6)
+        line.set_x2(var_lvl_22, var_lvl_19)
+        line.set_y1(var_lvl_22, var_klvl_7)
+        line.set_y2(var_lvl_22, var_klvl_7)
+        label.set_x(var_lvl_23, var_lvl_19)
+        label.set_y(var_lvl_23, var_klvl_7)
+        label.set_text(var_lvl_23, var_kl_3)
+        line.set_x1(var_lvl_24, var_klvl_8)
+        line.set_x2(var_lvl_24, var_lvl_20)
+        line.set_y1(var_lvl_24, var_klvl_9)
+        line.set_y2(var_lvl_24, var_klvl_9)
+        label.set_x(var_lvl_25, var_lvl_20)
+        label.set_y(var_lvl_25, var_klvl_9)
+        label.set_text(var_lvl_25, var_kl_1)
+        line.set_x1(var_lvl_26, var_klvl_10)
+        line.set_x2(var_lvl_26, var_lvl_21)
+        line.set_y1(var_lvl_26, var_klvl_11)
+        line.set_y2(var_lvl_26, var_klvl_11)
+        label.set_x(var_lvl_27, var_lvl_21)
+        label.set_y(var_lvl_27, var_klvl_11)
+        label.set_text(var_lvl_27, var_kl_2)
+        Combine_Levels(arr_price, arr_label, var_klvl_7, var_lvl_23, in_kl_6)
+        Combine_Levels(arr_price, arr_label, var_klvl_9, var_lvl_25, in_kl_6)
+        Combine_Levels(arr_price, arr_label, var_klvl_11, var_lvl_27, in_kl_6)
+    if in_kl_13
+        var_lvl_28 = extend_to_current(Rigth_Def)
+        var_lvl_29 = extend_to_current(Rigth_Def)
+        var_lvl_30 = extend_to_current(Rigth_Def)
+        var_lvl_31 = var_klvl_12
+        var var_lvl_32 = line.new(x1=var_lvl_31, x2=var_lvl_28, y1=var_klvl_13, y2=var_klvl_13, color=in_kl_14, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_15))
+        var var_lvl_33 = label.new(x=var_lvl_28, y=var_klvl_13, text=var_kl_7, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_14, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_lvl_34 = line.new(x1=var_klvl_14, x2=var_lvl_29, y1=var_klvl_15, y2=var_klvl_15, color=in_kl_14, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_15))
+        var var_lvl_35 = label.new(x=var_lvl_29, y=var_klvl_15, text=var_kl_5, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_14, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_lvl_36 = line.new(x1=var_klvl_16, x2=var_lvl_30, y1=var_klvl_13, y2=var_klvl_13, color=in_kl_14, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_15))
+        var var_lvl_37 = label.new(x=var_lvl_30, y=var_klvl_17, text=var_kl_6, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_14, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        line.set_x1(var_lvl_32, var_lvl_31)
+        line.set_x2(var_lvl_32, var_lvl_28)
+        line.set_y1(var_lvl_32, var_klvl_13)
+        line.set_y2(var_lvl_32, var_klvl_13)
+        label.set_x(var_lvl_33, var_lvl_28)
+        label.set_y(var_lvl_33, var_klvl_13)
+        label.set_text(var_lvl_33, var_kl_7)
+        line.set_x1(var_lvl_34, var_klvl_14)
+        line.set_x2(var_lvl_34, var_lvl_29)
+        line.set_y1(var_lvl_34, var_klvl_15)
+        line.set_y2(var_lvl_34, var_klvl_15)
+        label.set_x(var_lvl_35, var_lvl_29)
+        label.set_y(var_lvl_35, var_klvl_15)
+        label.set_text(var_lvl_35, var_kl_5)
+        line.set_x1(var_lvl_36, var_klvl_16)
+        line.set_x2(var_lvl_36, var_lvl_30)
+        line.set_y1(var_lvl_36, var_klvl_17)
+        line.set_y2(var_lvl_36, var_klvl_17)
+        label.set_x(var_lvl_37, var_lvl_30)
+        label.set_y(var_lvl_37, var_klvl_17)
+        label.set_text(var_lvl_37, var_kl_6)
+        Combine_Levels(arr_price, arr_label, var_klvl_13, var_lvl_33, in_kl_14)
+        Combine_Levels(arr_price, arr_label, var_klvl_15, var_lvl_35, in_kl_14)
+        Combine_Levels(arr_price, arr_label, var_klvl_17, var_lvl_37, in_kl_14)
+    if in_kl_25
+        var_lvl_38 = extend_to_current(Rigth_Def)
+        var_lvl_39 = extend_to_current(Rigth_Def)
+        var_lvl_40 = extend_to_current(Rigth_Def)
+        var var_lvl_41 = line.new(x1=var_klvl_40, x2=var_lvl_38, y1=var_klvl_41, y2=var_klvl_41, color=in_kl_26, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_27))
+        var var_lvl_42 = label.new(x=var_lvl_38, y=var_klvl_41, text=var_kl_18, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_26, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_lvl_43 = line.new(x1=var_klvl_38, x2=var_lvl_39, y1=var_klvl_39, y2=var_klvl_39, color=in_kl_26, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_27))
+        var var_lvl_44 = label.new(x=var_lvl_39, y=var_klvl_39, text=var_kl_17, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_26, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_lvl_45 = line.new(x1=var_klvl_36, x2=var_lvl_40, y1=var_klvl_37, y2=var_klvl_37, color=in_kl_26, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_27))
+        var var_lvl_46 = label.new(x=var_lvl_40, y=var_klvl_37, text=var_kl_19, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_26, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        line.set_x1(var_lvl_41, var_klvl_40)
+        line.set_x2(var_lvl_41, var_lvl_38)
+        line.set_y1(var_lvl_41, var_klvl_41)
+        line.set_y2(var_lvl_41, var_klvl_41)
+        label.set_x(var_lvl_42, var_lvl_38)
+        label.set_y(var_lvl_42, var_klvl_41)
+        label.set_text(var_lvl_42, var_kl_18)
+        line.set_x1(var_lvl_43, var_klvl_38)
+        line.set_x2(var_lvl_43, var_lvl_39)
+        line.set_y1(var_lvl_43, var_klvl_39)
+        line.set_y2(var_lvl_43, var_klvl_39)
+        label.set_x(var_lvl_44, var_lvl_39)
+        label.set_y(var_lvl_44, var_klvl_39)
+        label.set_text(var_lvl_44, var_kl_17)
+        line.set_x1(var_lvl_45, var_klvl_36)
+        line.set_x2(var_lvl_45, var_lvl_40)
+        line.set_y1(var_lvl_45, var_klvl_37)
+        line.set_y2(var_lvl_45, var_klvl_37)
+        label.set_x(var_lvl_46, var_lvl_40)
+        label.set_y(var_lvl_46, var_klvl_37)
+        label.set_text(var_lvl_46, var_kl_19)
+        Combine_Levels(arr_price, arr_label, var_klvl_39, var_lvl_44, in_kl_26)
+        Combine_Levels(arr_price, arr_label, var_klvl_41, var_lvl_42, in_kl_26)
+        Combine_Levels(arr_price, arr_label, var_klvl_37, var_lvl_46, in_kl_26)
+    if in_kl_21
+        var_lvl_47 = extend_to_current(Rigth_Def)
+        var_lvl_48 = extend_to_current(Rigth_Def)
+        var_lvl_49 = extend_to_current(Rigth_Def)
+        var var_lvl_50 = line.new(x1=var_klvl_30, x2=var_lvl_47, y1=var_klvl_31, y2=var_klvl_31, color=in_kl_22, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_23))
+        var var_lvl_51 = label.new(x=var_lvl_47, y=var_klvl_31, text=var_kl_15, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_22, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_lvl_52 = line.new(x1=var_klvl_32, x2=var_lvl_48, y1=var_klvl_33, y2=var_klvl_33, color=in_kl_22, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_23))
+        var var_lvl_53 = label.new(x=var_lvl_48, y=var_klvl_33, text=var_kl_13, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_22, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_lvl_54 = line.new(x1=var_klvl_34, x2=var_lvl_49, y1=var_klvl_35, y2=var_klvl_35, color=in_kl_22, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_23))
+        var var_lvl_55 = label.new(x=var_lvl_49, y=var_klvl_35, text=var_kl_14, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_22, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        line.set_x1(var_lvl_50, var_klvl_30)
+        line.set_x2(var_lvl_50, var_lvl_47)
+        line.set_y1(var_lvl_50, var_klvl_31)
+        line.set_y2(var_lvl_50, var_klvl_31)
+        label.set_x(var_lvl_51, var_lvl_47)
+        label.set_y(var_lvl_51, var_klvl_31)
+        label.set_text(var_lvl_51, var_kl_15)
+        line.set_x1(var_lvl_52, var_klvl_32)
+        line.set_x2(var_lvl_52, var_lvl_48)
+        line.set_y1(var_lvl_52, var_klvl_33)
+        line.set_y2(var_lvl_52, var_klvl_33)
+        label.set_x(var_lvl_53, var_lvl_48)
+        label.set_y(var_lvl_53, var_klvl_33)
+        label.set_text(var_lvl_53, var_kl_13)
+        line.set_x1(var_lvl_54, var_klvl_34)
+        line.set_x2(var_lvl_54, var_lvl_49)
+        line.set_y1(var_lvl_54, var_klvl_35)
+        line.set_y2(var_lvl_54, var_klvl_35)
+        label.set_x(var_lvl_55, var_lvl_49)
+        label.set_y(var_lvl_55, var_klvl_35)
+        label.set_text(var_lvl_55, var_kl_14)
+        Combine_Levels(arr_price, arr_label, var_klvl_35, var_lvl_55, in_kl_22)
+        Combine_Levels(arr_price, arr_label, var_klvl_31, var_lvl_51, in_kl_22)
+        Combine_Levels(arr_price, arr_label, var_klvl_33, var_lvl_53, in_kl_22)
+    if in_kl_17
+        var_lvl_56 = extend_to_current(Rigth_Def)
+        var var_lvl_57 = line.new(x1=var_klvl_18, x2=var_lvl_56, y1=var_klvl_19, y2=var_klvl_19, color=in_kl_18, width=linewidth_def, xloc=xloc.bar_time, style=lineStyle(in_kl_19))
+        var var_lvl_58 = label.new(x=var_lvl_56, y=var_klvl_19, text=var_kl_11, style=DEFAULT_LABEL_STYLE, textcolor=in_kl_18, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        line.set_x1(var_lvl_57, var_klvl_18)
+        line.set_x2(var_lvl_57, var_lvl_56)
+        line.set_y1(var_lvl_57, var_klvl_19)
+        line.set_y2(var_lvl_57, var_klvl_19)
+        label.set_x(var_lvl_58, var_lvl_56)
+        label.set_y(var_lvl_58, var_klvl_19)
+        label.set_text(var_lvl_58, var_kl_11)
+        Combine_Levels(arr_price, arr_label, var_klvl_19, var_lvl_58, in_kl_18)
+
+//-----------------------------------------------------------------------------
+// Sessions
+//-----------------------------------------------------------------------------
+
+atr = ta.atr(200)
+cmean_range = ta.cum(high - low) / n
+
+London = time(timeframe.period, in_sl_11)
+US = time(timeframe.period, in_sl_12)
+Asia = time(timeframe.period, in_sl_13)
+
+var var_s_lvl_1 = 0.0
+var var_s_lvl_2 = close
+var var_s_lvl_3 = time
+var var_s_lvl_4 = 0.0
+var var_s_lvl_5 = 0.0
+var var_s_lvl_6 = 0.0
+
+var onelondonfalse = false
+if London
+    if high > var_s_lvl_1
+        var_s_lvl_1 := high
+        var_s_lvl_1
+    if low < var_s_lvl_2
+        var_s_lvl_2 := low
+        var_s_lvl_2
+    if onelondonfalse
+        var_s_lvl_3 := time
+        var_s_lvl_6 := open
+        var_s_lvl_6
+    var_s_lvl_4 := var_s_lvl_1
+    var_s_lvl_5 := var_s_lvl_2
+    onelondonfalse := false
+    onelondonfalse
+else
+    if onelondonfalse == false
+        var_s_lvl_4 := var_s_lvl_1
+        var_s_lvl_5 := var_s_lvl_2
+        var_s_lvl_5
+    onelondonfalse := true
+    var_s_lvl_1 := 0.0
+    var_s_lvl_2 := close
+    var_s_lvl_2
+
+var var_s_lvl_7 = 0.0
+var var_s_lvl_8 = close
+var var_s_lvl_9 = time
+var var_s_lvl_10 = 0.0
+var var_s_lvl_11 = 0.0
+var var_s_lvl_12 = 0.0
+
+var oneusfalse = false
+if US
+    if high > var_s_lvl_7
+        var_s_lvl_7 := high
+        var_s_lvl_7
+    if low < var_s_lvl_8
+        var_s_lvl_8 := low
+        var_s_lvl_8
+    if oneusfalse
+        var_s_lvl_9 := time
+        var_s_lvl_12 := open
+        var_s_lvl_12
+    var_s_lvl_10 := var_s_lvl_7
+    var_s_lvl_11 := var_s_lvl_8
+    oneusfalse := false
+    oneusfalse
+else
+    if oneusfalse == false
+        var_s_lvl_10 := var_s_lvl_7
+        var_s_lvl_11 := var_s_lvl_8
+        var_s_lvl_11
+    oneusfalse := true
+    var_s_lvl_7 := 0.0
+    var_s_lvl_8 := close
+    var_s_lvl_8
+
+var var_s_lvl_13 = 0.0
+var var_s_lvl_14 = close
+var var_s_lvl_15 = time
+var var_s_lvl_16 = 0.0
+var var_s_lvl_17 = 0.0
+var var_s_lvl_18 = 0.0
+
+var oneasiafalse = false
+if Asia
+    if high > var_s_lvl_13
+        var_s_lvl_13 := high
+        var_s_lvl_13
+    if low < var_s_lvl_14
+        var_s_lvl_14 := low
+        var_s_lvl_14
+    if oneasiafalse
+        var_s_lvl_15 := time
+        var_s_lvl_18 := open
+        var_s_lvl_18
+    var_s_lvl_16 := var_s_lvl_13
+    var_s_lvl_17 := var_s_lvl_14
+    oneasiafalse := false
+    oneasiafalse
+else
+    if oneasiafalse == false
+        var_s_lvl_16 := var_s_lvl_13
+        var_s_lvl_17 := var_s_lvl_14
+        var_s_lvl_17
+    oneasiafalse := true
+    var_s_lvl_13 := 0.0
+    var_s_lvl_14 := close
+    var_s_lvl_14
+
+var high_eqh_pre = 0., var eq_top_x = 0, var low_eqh_pre = 0., var eq_btm_x = 0
+
+if in_ms_5
+    high_eqh = ta.pivothigh(in_ms_16, in_ms_16)
+    low_eqh = ta.pivotlow(in_ms_16, in_ms_16)
+    if low_eqh
+        if math.min(low_eqh, low_eqh_pre) > math.max(low_eqh, low_eqh_pre) - atr * in_ms_8
+            eql_line = line.new(eq_btm_x, low_eqh_pre, n - in_ms_16, low_eqh, color=in_ms_6, style=line.style_dotted)
+            eql_lbl = label.new(int(math.avg(n - in_ms_16, eq_btm_x)), low_eqh, "EQL", color=#00000000, textcolor=in_ms_6, style=label.style_label_up, size=in_ms_13)
+        low_eqh_pre := low_eqh
+        eq_btm_x := n - in_ms_16
+    if high_eqh
+        if math.max(high_eqh, high_eqh_pre) < math.min(high_eqh, high_eqh_pre) + atr * in_ms_8
+            eqh_line = line.new(eq_top_x, high_eqh_pre, n - in_ms_16, high_eqh, color=in_ms_7, style=line.style_dotted)
+            eqh_lbl = label.new(int(math.avg(n - in_ms_16, eq_top_x)), high_eqh, "EQH", color=#00000000, textcolor=in_ms_7, style=label.style_label_down, size=in_ms_13)
+        high_eqh_pre := high_eqh
+        eq_top_x := n - in_ms_16
+
+if barstate.islast
+    arr_price := array.new_float(0)
+    arr_label := array.new_label(0)
+    if in_sl_1
+        london_limit_right = extend_to_current(Rigth_Def)
+        var var_s_lvl_19 = line.new(x1=var_s_lvl_3, x2=london_limit_right, y1=var_s_lvl_4, y2=var_s_lvl_4, color=in_sl_3 ? in_sl_14 : na, width=linewidth_def, xloc=xloc.bar_time, style=linestyles)
+        var var_s_lvl_20 = line.new(x1=var_s_lvl_3, x2=london_limit_right, y1=var_s_lvl_5, y2=var_s_lvl_5, color=in_sl_3 ? in_sl_14 : na, width=linewidth_def, xloc=xloc.bar_time, style=linestyles)
+        var var_s_lvl_21 = line.new(x1=var_s_lvl_3, x2=london_limit_right, y1=var_s_lvl_6, y2=var_s_lvl_6, color=in_sl_2 ? in_sl_14 : na, width=linewidth_def, xloc=xloc.bar_time, style=linestyles)
+        var var_s_lvl_22 = label.new(x=london_limit_right, y=var_s_lvl_4, text=var_sl_1, style=DEFAULT_LABEL_STYLE, textcolor=in_sl_3 ? in_sl_14 : na, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_s_lvl_23 = label.new(x=london_limit_right, y=var_s_lvl_5, text=var_sl_2, style=DEFAULT_LABEL_STYLE, textcolor=in_sl_3 ? in_sl_14 : na, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_s_lvl_24 = label.new(x=london_limit_right, y=var_s_lvl_6, text=var_sl_3, style=DEFAULT_LABEL_STYLE, textcolor=in_sl_2 ? in_sl_14 : na, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        line.set_x1(var_s_lvl_19, var_s_lvl_3)
+        line.set_x2(var_s_lvl_19, london_limit_right)
+        line.set_y1(var_s_lvl_19, var_s_lvl_4)
+        line.set_y2(var_s_lvl_19, var_s_lvl_4)
+        line.set_x1(var_s_lvl_20, var_s_lvl_3)
+        line.set_x2(var_s_lvl_20, london_limit_right)
+        line.set_y1(var_s_lvl_20, var_s_lvl_5)
+        line.set_y2(var_s_lvl_20, var_s_lvl_5)
+        line.set_x1(var_s_lvl_21, var_s_lvl_3)
+        line.set_x2(var_s_lvl_21, london_limit_right)
+        line.set_y1(var_s_lvl_21, var_s_lvl_6)
+        line.set_y2(var_s_lvl_21, var_s_lvl_6)
+        label.set_x(var_s_lvl_22, london_limit_right)
+        label.set_y(var_s_lvl_22, var_s_lvl_4)
+        label.set_text(var_s_lvl_22, var_sl_1)
+        label.set_x(var_s_lvl_23, london_limit_right)
+        label.set_y(var_s_lvl_23, var_s_lvl_5)
+        label.set_text(var_s_lvl_23, var_sl_2)
+        label.set_x(var_s_lvl_24, london_limit_right)
+        label.set_y(var_s_lvl_24, var_s_lvl_6)
+        label.set_text(var_s_lvl_24, var_sl_3)
+        Combine_Levels(arr_price, arr_label, var_s_lvl_4, var_s_lvl_22, in_sl_14)
+        Combine_Levels(arr_price, arr_label, var_s_lvl_5, var_s_lvl_23, in_sl_14)
+        Combine_Levels(arr_price, arr_label, var_s_lvl_6, var_s_lvl_24, in_sl_14)
+    if in_sl_4
+        us_limit_right = extend_to_current(Rigth_Def)
+        var var_s_lvl_25 = line.new(x1=var_s_lvl_9, x2=us_limit_right, y1=var_s_lvl_10, y2=var_s_lvl_10, color=in_sl_6 ? in_sl_15 : na, width=linewidth_def, xloc=xloc.bar_time, style=linestyles)
+        var var_s_lvl_26 = line.new(x1=var_s_lvl_9, x2=us_limit_right, y1=var_s_lvl_11, y2=var_s_lvl_11, color=in_sl_6 ? in_sl_15 : na, width=linewidth_def, xloc=xloc.bar_time, style=linestyles)
+        var var_s_lvl_27 = line.new(x1=var_s_lvl_9, x2=us_limit_right, y1=var_s_lvl_12, y2=var_s_lvl_12, color=in_sl_5 ? in_sl_15 : na, width=linewidth_def, xloc=xloc.bar_time, style=linestyles)
+        var var_s_lvl_28 = label.new(x=us_limit_right, y=var_s_lvl_10, text=var_sl_1, style=DEFAULT_LABEL_STYLE, textcolor=in_sl_6 ? in_sl_15 : na, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_s_lvl_29 = label.new(x=us_limit_right, y=var_s_lvl_11, text=var_sl_2, style=DEFAULT_LABEL_STYLE, textcolor=in_sl_6 ? in_sl_15 : na, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_s_lvl_30 = label.new(x=us_limit_right, y=var_s_lvl_12, text=var_sl_3, style=DEFAULT_LABEL_STYLE, textcolor=in_sl_5 ? in_sl_15 : na, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        line.set_x1(var_s_lvl_25, var_s_lvl_9)
+        line.set_x2(var_s_lvl_25, us_limit_right)
+        line.set_y1(var_s_lvl_25, var_s_lvl_10)
+        line.set_y2(var_s_lvl_25, var_s_lvl_10)
+        line.set_x1(var_s_lvl_26, var_s_lvl_9)
+        line.set_x2(var_s_lvl_26, us_limit_right)
+        line.set_y1(var_s_lvl_26, var_s_lvl_11)
+        line.set_y2(var_s_lvl_26, var_s_lvl_11)
+        line.set_x1(var_s_lvl_27, var_s_lvl_9)
+        line.set_x2(var_s_lvl_27, us_limit_right)
+        line.set_y1(var_s_lvl_27, var_s_lvl_12)
+        line.set_y2(var_s_lvl_27, var_s_lvl_12)
+        label.set_x(var_s_lvl_28, us_limit_right)
+        label.set_y(var_s_lvl_28, var_s_lvl_10)
+        label.set_text(var_s_lvl_28, var_sl_4)
+        label.set_x(var_s_lvl_29, us_limit_right)
+        label.set_y(var_s_lvl_29, var_s_lvl_11)
+        label.set_text(var_s_lvl_29, var_sl_5)
+        label.set_x(var_s_lvl_30, us_limit_right)
+        label.set_y(var_s_lvl_30, var_s_lvl_12)
+        label.set_text(var_s_lvl_30, var_sl_6)
+        Combine_Levels(arr_price, arr_label, var_s_lvl_10, var_s_lvl_28, in_sl_15)
+        Combine_Levels(arr_price, arr_label, var_s_lvl_11, var_s_lvl_29, in_sl_15)
+        Combine_Levels(arr_price, arr_label, var_s_lvl_12, var_s_lvl_30, in_sl_15)
+    if in_sl_7
+        asia_limit_right = extend_to_current(Rigth_Def)
+        var var_s_lvl_31 = line.new(x1=var_s_lvl_15, x2=asia_limit_right, y1=var_s_lvl_16, y2=var_s_lvl_16, color=in_sl_9 ? in_sl_16 : na, width=linewidth_def, xloc=xloc.bar_time, style=linestyles)
+        var var_s_lvl_32 = line.new(x1=var_s_lvl_15, x2=asia_limit_right, y1=var_s_lvl_17, y2=var_s_lvl_17, color=in_sl_9 ? in_sl_16 : na, width=linewidth_def, xloc=xloc.bar_time, style=linestyles)
+        var var_s_lvl_33 = line.new(x1=var_s_lvl_15, x2=asia_limit_right, y1=var_s_lvl_18, y2=var_s_lvl_18, color=in_sl_8 ? in_sl_16 : na, width=linewidth_def, xloc=xloc.bar_time, style=linestyles)
+        var var_s_lvl_34 = label.new(x=asia_limit_right, y=var_s_lvl_16, text=var_sl_7, style=DEFAULT_LABEL_STYLE, textcolor=in_sl_9 ? in_sl_16 : na, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_s_lvl_35 = label.new(x=asia_limit_right, y=var_s_lvl_17, text=var_sl_8, style=DEFAULT_LABEL_STYLE, textcolor=in_sl_9 ? in_sl_16 : na, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        var var_s_lvl_36 = label.new(x=asia_limit_right, y=var_s_lvl_18, text=var_sl_9, style=DEFAULT_LABEL_STYLE, textcolor=in_sl_8 ? in_sl_16 : na, size=DEFAULT_LABEL_SIZE, xloc=xloc.bar_time,color = #00000000)
+        line.set_x1(var_s_lvl_31, var_s_lvl_15)
+        line.set_x2(var_s_lvl_31, asia_limit_right)
+        line.set_y1(var_s_lvl_31, var_s_lvl_16)
+        line.set_y2(var_s_lvl_31, var_s_lvl_16)
+        line.set_x1(var_s_lvl_32, var_s_lvl_15)
+        line.set_x2(var_s_lvl_32, asia_limit_right)
+        line.set_y1(var_s_lvl_32, var_s_lvl_17)
+        line.set_y2(var_s_lvl_32, var_s_lvl_17)
+        line.set_x1(var_s_lvl_33, var_s_lvl_15)
+        line.set_x2(var_s_lvl_33, asia_limit_right)
+        line.set_y1(var_s_lvl_33, var_s_lvl_18)
+        line.set_y2(var_s_lvl_33, var_s_lvl_18)
+        label.set_x(var_s_lvl_34, asia_limit_right)
+        label.set_y(var_s_lvl_34, var_s_lvl_16)
+        label.set_text(var_s_lvl_34, var_sl_7)
+        label.set_x(var_s_lvl_35, asia_limit_right)
+        label.set_y(var_s_lvl_35, var_s_lvl_17)
+        label.set_text(var_s_lvl_35, var_sl_8)
+        label.set_x(var_s_lvl_36, asia_limit_right)
+        label.set_y(var_s_lvl_36, var_s_lvl_18)
+        label.set_text(var_s_lvl_36, var_sl_9)
+        Combine_Levels(arr_price, arr_label, var_s_lvl_16, var_s_lvl_34, in_sl_16)
+        Combine_Levels(arr_price, arr_label, var_s_lvl_17, var_s_lvl_35, in_sl_16)
+        Combine_Levels(arr_price, arr_label, var_s_lvl_18, var_s_lvl_36, in_sl_16)
+
+var_ms_s_1 = in_ms_2
+var_ms_s_2 = in_ms_3
+var var_ms_s_3 = var_ms_s_1
+var var_ms_s_4 = var_ms_s_2
+var var_ms_s_5 = in_ms_2
+var var_ms_s_6 = in_ms_3
+[var_ms_s_7, var_ms_s_8] = custom_func_4(length)
+n := bar_index
+
+hl() => [high, low]
+var float thold = (ta.highest(300) - ta.lowest(300)) * math.max(0.5, 0.1) / 100.
+var_ms_s_9 = in_ms_13
+[var_ms_s_10, var_ms_s_11] = custom_func_4(in_ms_15)
+var_ms_s_12 = in_ms_13
+
+if var_ms_s_8
+    variable_ms_12 := true
+    variable_ms_9 := var_ms_s_8
+    variable_ms_10 := n - length
+
+if var_ms_s_7
+    variable_ms_11 := true
+    variable_ms_7 := var_ms_s_7
+    variable_ms_8 := n - length
+if var_ms_s_11
+    variable_ms_14 := true
+    variable_ms_5 := var_ms_s_11
+    variable_ms_6 := n - in_ms_15
+
+if var_ms_s_10
+    variable_ms_13 := true
+    variable_ms_3 := var_ms_s_10
+    variable_ms_4 := n - in_ms_15
+
+bull_mss = false, bull_mss_ = false, bull_bos = false, bull_bos_ = false, bear_mss = false, bear_mss_ = false, bear_bos = false, bear_bos_ = false
+
+if ta.crossover(close, variable_ms_3) and variable_ms_13 and variable_ms_7 != variable_ms_3
+    bool MSS = na
+    MSS := variable_ms_2 < 0
+    variable_ms_13 := false
+    variable_ms_2 := 1
+    bull_mss := MSS ? true : false
+    bull_bos := MSS ? false : true
+    if in_ms_1 and (in_ms_4 == "All" or in_ms_4 == "Internal")
+        custom_func_2(variable_ms_4, variable_ms_3, MSS ? "MSS" : "BOS", var_ms_s_5, true, true, var_ms_s_9)
+
+if ta.crossunder(close, variable_ms_5) and variable_ms_14 and variable_ms_9 != variable_ms_5
+    bool MSS = false
+    MSS := variable_ms_2 > 0
+    variable_ms_14 := false
+    variable_ms_2 := -1
+    bear_mss := MSS ? true : false
+    bear_bos := MSS ? false : true
+    if in_ms_1 and (in_ms_4 == "All" or in_ms_4 == "Internal")
+        custom_func_2(variable_ms_6, variable_ms_5, MSS ? "MSS" : "BOS", var_ms_s_6, true, false, var_ms_s_9)
+
+alertcondition(bull_mss, "Bullish MSS", "Bullish MSS Found Ez-SMC")
+alertcondition(bear_mss, "Bearish MSS", "Bearish MSS Found Ez-SMC")
+alertcondition(bull_bos, "Bullish BOS", "Bullish BOS Found Ez-SMC")
+alertcondition(bear_bos, "Bearish MSS", "Bearish MSS Found Ez-SMC")
+
+if ta.crossover(close, variable_ms_7) and variable_ms_11
+    bool MSS = na
+    MSS := variable_ms_1 < 0
+    variable_ms_11 := false
+    variable_ms_1 := 1
+    bull_mss_ := MSS ? true : false
+    bull_bos_ := MSS ? false : true
+    if in_ms_1 and (in_ms_4 == "All" or in_ms_4 == "External")
+        custom_func_2(variable_ms_8, variable_ms_7, MSS ? "MSS+" : "BOS+", var_ms_s_3, false, true, var_ms_s_12)
+
+if ta.crossunder(close, variable_ms_9) and variable_ms_12
+    bool MSS = na
+    MSS := variable_ms_1 > 0
+    variable_ms_12 := false
+    variable_ms_1 := -1
+    bear_mss_ := MSS ? true : false
+    bear_bos_ := MSS ? false : true
+    if in_ms_1 and (in_ms_4 == "All" or in_ms_4 == "External")
+        custom_func_2(variable_ms_10, variable_ms_9, MSS ? "MSS+" : "BOS+", var_ms_s_4, false, false, var_ms_s_12)
+
+alertcondition(bull_mss_, "Bullish MSS+", "Bullish MSS+ Found Ez-SMC")
+alertcondition(bear_mss_, "Bearish MSS+", "Bearish MSS+ Found Ez-SMC")
+alertcondition(bear_bos_, "Bearish BOS+", "Bearish BOS+ Found Ez-SMC")
+alertcondition(bull_bos_, "Bullish BOS+", "Bullish BOS+ Found Ez-SMC")
+
+//-----------------------------------------------------------------------------
+// Order Blocks
+//-----------------------------------------------------------------------------
+
+custom_func_17(n) =>
+    s = str.tostring(n)
+    int r = int(str.tonumber(s[0]))
+    for c = 0 to str.length(s) - 1
+        if s[c] != "0"
+            r := int(str.tonumber(s[c]))
+    r
+
+// Order Block Coordinates Function
+custom_func_18(loc, b_index, var_ob_5, var_ob_4) =>
+    type_obs = "none"
+    valid = false
+    H = high
+    L = low
+    O = open
+    C = close
+    V = volume
+
+    H_avg = math.avg(high,high[1],high[2],high[3],high[4])
+    L_avg = math.avg(low,low[1],low[2],low[3],low[4])
+    O_avg = math.avg(open,open[1],open[2],open[3],open[4])
+    C_avg = math.avg(close,close[1],close[2],close[3],close[4])
+    V_avg = math.avg(volume,volume[1],volume[2],volume[3],volume[4])
+
+    idx = 1
+    volume_ = 0.0
+    b_volume = 0
+    s_volume = 0
+    use_max = false
+    min = 99999999.
+    max = 0.
+    if open[5] > close[5] and close[4] >= open[5] and low[1] > high[5] and low > high[5] and var_ob_4
+        if low[5] > low[4]
+            type_obs := "Internal Bearish"
+            H := math.min(high[4], high[5])
+            L := low[4]
+            O := open[4]
+            C := close[4]
+            V := volume[4]
+            idx := time[4]
+            valid := true
+            use_max := false
+        else
+            type_obs := "Internal Bearish"
+            H := high[5]
+            L := low[5]
+            O := open[5]
+            C := close[5]
+            V := volume[5]
+            idx := time[5]
+            valid := true
+            use_max := false
+    else if open[5] < close[5] and close[4] <= open[5] and high[1] < low[5] and high < low[5] and var_ob_4
+        if high[4] > high[5]
+            type_obs := "Internal Bullish"
+            H := high[4]
+            L := math.max(low[4], low[5])
+            O := open[4]
+            C := close[4]
+            V := volume[4]
+            idx := time[4]
+            valid := true
+            use_max := true
+        else
+            type_obs := "Internal Bullish"
+            H := high[5]
+            L := low[5]
+            O := open[5]
+            C := close[5]
+            V := volume[5]
+            idx := time[5]
+            valid := true
+            use_max := true
+    else if open[5] > close[5] and close[4] > close[5] and close[3] >= open[5] and low > high[5] and var_ob_4
+        if low[5] > low[4]
+            type_obs := "Internal Bearish"
+            H := math.min(high[4], high[5])
+            L := low[4]
+            O := open[4]
+            C := close[4]
+            V := volume[4]
+            idx := time[4]
+            valid := true
+            use_max := false
+        else
+            type_obs := "Internal Bearish"
+            H := high[5]
+            L := low[5]
+            O := open[5]
+            C := close[5]
+            V := volume[5]
+            idx := time[5]
+            valid := true
+            use_max := false
+    else if open[5] < close[5] and close[4] < close[5] and close[3] <= open[5] and high < low[5] and var_ob_4
+        if high[4] > high[5]
+            type_obs := "Internal Bullish"
+            H := high[4]
+            L := math.max(low[4], low[5])
+            O := open[4]
+            C := close[4]
+            V := volume[4]
+            idx := time[4]
+            valid := true
+            use_max := true
+        else
+            type_obs := "Internal Bullish"
+            H := high[5]
+            L := low[5]
+            O := open[5]
+            C := close[5]
+            V := volume[5]
+            idx := time[5]
+            valid := true
+            use_max := true
+    else
+        valid := false
+    if valid
+        ind = 0
+        thold_ = (ta.highest(300) - ta.lowest(300)) * (var_ob_10 / 2.) / 100.
+        buyingVolume = math.round(V_avg * (C_avg - L_avg) / (H_avg - L_avg))
+        sellingVolume = math.round(V_avg * (H_avg - C_avg) / (H_avg - L_avg))
+        t_volume = (buyingVolume + sellingVolume)
+        b_volume := int(((buyingVolume / t_volume) * 100)/3)
+        s_volume := int(((sellingVolume / t_volume) * 100)/3)
+        volume_ := V_avg
+        // Search for Highest/Lowest High within the structure interval and get range
+        if use_max
+            max := H
+            min_1 = L
+            min := math.max(min_1, max - thold_)
+        else
+            max_1 = H
+            min := L
+            max := math.min(max_1, min + thold_)
+    [valid, volume_, b_volume, s_volume, max, min, idx, use_max ? -1 : 1, type_obs]
+
+// Set Order Blocks
+custom_func_19(boxes, lines, target_top, target_btm, target_left, target_type, show_last, swing, size, vol, col_1, col_2, in_ob_9, in_ob_10, tf_text, tf_text_2, ob_text_size, vol_text, perct_text, text_color_ob, in_ob_16s, in_ob_18s) =>
+    for x = 0 to show_last - 1
+        get_box = array.get(boxes, x)
+        box.set_lefttop(get_box, na, na)
+        box.set_rightbottom(get_box, na, na)
+        box.set_border_color(get_box, na)
+        box.set_bgcolor(get_box, na)
+        get_line = array.get(lines, x)
+        line.set_color(get_line, na)
+        line.set_xy1(get_line, na, na)
+        line.set_xy2(get_line, na, na)
+    for i = 0 to size - 1
+        get_box = array.get(boxes, i)
+        get_line = array.get(lines, i)
+        max_left = bar_index - 750
+        volume_sum = array.sum(vol)
+        volume_ = array.get(vol, i) > 1000000000 ? array.get(vol, i) / 1000000000. : array.get(vol, i) > 1000000 ? array.get(vol, i) / 1000000. : array.get(vol, i) / 1000.
+        volume_per = (array.get(vol, i) / volume_sum) * 100
+        unit = array.get(vol, i) > 1000000000 ? " B" : array.get(vol, i) > 1000000 ? " M" : " K"
+        text_vol = vol_text and perct_text ? tf_text + str.tostring(volume_, "#.##") + unit + " (" + str.tostring(volume_per, "#.##") + "%)" : vol_text and not (perct_text) ? tf_text + str.tostring(volume_, "#.##") + unit : not (vol_text) and perct_text ? tf_text + " " + str.tostring(volume_per, "#.##") + "%" : tf_text_2 + ""
+        if true
+            box.set_lefttop(get_box, array.get(target_left, i), array.get(target_top, i))
+            box.set_rightbottom(get_box, timenow + ((var_ob_13) * in_ob_9), array.get(target_btm, i))
+            box.set_text(get_box, text_vol)
+            box.set_border_width(get_box, 2)
+            box.set_text_halign(get_box, text.align_right)
+            box.set_text_valign(get_box, text.align_center)
+            box.set_text_size(get_box, ob_text_size)
+            fully_extend = not (vol_text) and not (perct_text) and in_ob_10 ? extend.right : extend.none
+            len_ext = not (vol_text) and not (perct_text) ? in_ob_9 : in_ob_9 / 2
+            line.set_extend(get_line, fully_extend)
+            line.set_style(get_line, in_ob_18s)
+            line.set_xy1(get_line, array.get(target_left, i), array.get(target_top, i) - (array.get(target_top, i) - array.get(target_btm, i)) / 2)
+            line.set_xy2(get_line, time + ((var_ob_13) * (len_ext)), array.get(target_top, i) - (array.get(target_top, i) - array.get(target_btm, i)) / 2)
+            if in_ob_16s
+                line.set_color(get_line, color.gray)
+            if in_ob_10
+                box.set_extend(get_box, extend.right)
+
+
+            color css = na
+            css := array.get(target_type, i) == 1 ? col_1 : col_2
+            ob_pos = array.get(target_type, i) == 1 ? true : false
+            if in_ob_42 == "Lines"
+                line.set_color(get_line, css)
+                line.set_style(get_line,in_ob_44)
+                line.set_width(get_line,in_ob_45)
+
+                if in_ob_10
+                    line.set_extend(get_line,extend.right)
+                    line.set_width(get_line,3)
+                if ob_pos
+                    line.set_y1(get_line,array.get(target_top, i))
+                    line.set_y2(get_line,array.get(target_top, i))
+                else
+                    line.set_y1(get_line,array.get(target_btm, i))
+                    line.set_y2(get_line,array.get(target_btm, i))
+            else
+                box.set_border_color(get_box, css)
+                box.set_bgcolor(get_box, css)
+                box.set_border_color(get_box, css)
+                box.set_text_color(get_box, text_color_ob)
+
+
+
+
+custom_func_20(boxes, target_top, target_btm, target_left, target_type, show_last, swing, size, right1, right2) =>
+    for x = 0 to show_last - 1
+        get_box = array.get(boxes, x)
+        box.set_lefttop(get_box, na, na)
+        box.set_rightbottom(get_box, na, na)
+        box.set_border_color(get_box, na)
+        box.set_bgcolor(get_box, na)
+
+    for i = 0 to math.min(show_last - 1, size - 1)
+        get_box = array.get(boxes, i)
+        x = 1000000000000
+        max_left = bar_index - 750
+        right = array.get(right1, i)//math.max(array.get(right1, i), array.get(right2, i))
+        max_right = array.get(target_left, i) + ((var_ob_13) * right + 10)
+        if true
+            box.set_lefttop(get_box, math.max(array.get(target_left, i), max_left), array.get(target_top, i) - (array.get(target_top, i) - array.get(target_btm, i)) / 2)
+            box.set_rightbottom(get_box, math.min(max_right, timenow + ((var_ob_13) * 20)), array.get(target_btm, i) ) //+ (array.get(target_top, i) - array.get(target_btm, i)) / 2)
+            color css = na
+            if true
+                css := array.get(right1, i) > array.get(right2, i) ? in_ob_40 : in_ob_40
+                box.set_border_color(get_box, color.new(css, 100))
+                box.set_bgcolor(get_box, css)
+
+custom_func_21(boxes, target_top, target_btm, target_left, target_type, show_last, swing, size,right)=>
+    for x = 0 to show_last-1
+        get_box = array.get(boxes, x)
+        box.set_lefttop(get_box, na, na)
+        box.set_rightbottom(get_box, na , na)
+        box.set_border_color(get_box, na)
+        box.set_bgcolor(get_box, na)
+
+    for i = 0 to math.min(show_last-1, size-1)
+        get_box = array.get(boxes, i)
+        x=1000000000000
+        max_left=bar_index-750
+        max_right=array.get(target_left, i)+(((var_ob_13)*(array.get(right, i)+5))) //> time+((var_ob_13)*20) ? time+((time[1]-time[2])*20) : array.get(target_left, i)+(time+((time[1]-time[2])*(array.get(right, i)+10)))
+        if true//max_left<array.get(target_left, i)
+            box.set_lefttop(get_box,array.get(target_left, i), array.get(target_top, i))
+            box.set_rightbottom(get_box, math.min(max_right,timenow+((var_ob_13)*20)), array.get(target_top, i)-(array.get(target_top, i) - array.get(target_btm, i))/2)
+            //box.set_extend(get_box, extend.right)
+            color css = na
+            if true//max_left<array.get(target_left, i)
+                css := array.get(target_type, i) == 1 ? in_ob_41 : in_ob_41
+                box.set_border_color(get_box, color.new(css,100))
+                box.set_bgcolor(get_box, css)
+
+custom_func_22(target_top, target_btm, target_left, target_type, show_last, swing, size) =>
+    del_index = 0
+    deleted = false
+    for i = 0 to size - 1
+        if i > 0
+            for x = i - 1 to 0
+                if array.get(target_top, i) >= array.get(target_btm, x) and array.get(target_top, i) <= array.get(target_top, x)
+                    deleted := true
+                    del_index := i
+                if array.get(target_btm, i) >= array.get(target_btm, x) and array.get(target_btm, i) <= array.get(target_top, x)
+                    deleted := true
+                    del_index := i
+                if array.get(target_btm, i) == array.get(target_btm, x) and array.get(target_top, i) == array.get(target_top, x)
+                    deleted := true
+                    del_index := i
+                if array.get(target_btm, i) <= array.get(target_btm, x) and array.get(target_top, i) >= array.get(target_top, x)
+                    deleted := true
+                    del_index := i
+    [deleted, del_index]
+
+custom_func_23() => ((time[1] - time[101]) / 100)
+
+//-----------------------------------------------------------------------------
+// Order Blocks Arrays
+//-----------------------------------------------------------------------------
+
+var ob_top = array.new_float(0)
+var ob_btm = array.new_float(0)
+var ob_left = array.new_int(0)
+var ob_type = array.new_int(0)
+var ob_sell_vol = array.new_int(0)
+var ob_buy_vol = array.new_int(0)
+var ob_vol = array.new_float(0)
+
+var ob_top_mtf = array.new_float(0)
+var ob_btm_mtf = array.new_float(0)
+var ob_left_mtf = array.new_int(0)
+var ob_type_mtf = array.new_int(0)
+var ob_sell_vol_mtf = array.new_int(0)
+var ob_buy_vol_mtf = array.new_int(0)
+var ob_vol_mtf = array.new_float(0)
+
+bar_merge = barmerge.gaps_off
+look_bars = barmerge.lookahead_on
+
+[valid_ob, volume_, b_volume, s_volume, top_ob, btm_ob, left_ob, type_ob, _type] = request.security(ticker.standard(syminfo.tickerid), in_ob_5, custom_func_18(variable_ms_8, bar_index, var_ob_5, var_ob_4), bar_merge, look_bars)
+
+[valid_ob_mtf, volume__mtf, b_volume_mtf, s_volume_mtf, top_ob_mtf, btm_ob_mtf, left_ob_mtf, type_ob_mtf, _type_mtf] = request.security(ticker.standard(syminfo.tickerid), in_ob_24, custom_func_18(variable_ms_8, bar_index, var_ob_7, var_ob_6), bar_merge, look_bars)
+
+tf1_index_time = request.security(ticker.standard(syminfo.tickerid), in_ob_5, custom_func_23(), bar_merge, look_bars)
+tf2_index_time = request.security(ticker.standard(syminfo.tickerid), in_ob_24, custom_func_23(), bar_merge, look_bars)
+
+if valid_ob and not (valid_ob[1]) and barstate.isconfirmed
+    array.unshift(ob_vol, volume_)
+    array.unshift(ob_buy_vol, b_volume)
+    array.unshift(ob_sell_vol, s_volume)
+    array.unshift(ob_top, top_ob)
+    array.unshift(ob_btm, btm_ob)
+    array.unshift(ob_left, left_ob)
+    array.unshift(ob_type, type_ob)
+
+if valid_ob_mtf and not (valid_ob_mtf[1]) and barstate.isconfirmed
+    array.unshift(ob_vol_mtf, volume__mtf)
+    array.unshift(ob_buy_vol_mtf, b_volume_mtf)
+    array.unshift(ob_sell_vol_mtf, s_volume_mtf)
+    array.unshift(ob_top_mtf, top_ob_mtf)
+    array.unshift(ob_btm_mtf, btm_ob_mtf)
+    array.unshift(ob_left_mtf, time - ((tf2_index_time) * 5))
+    array.unshift(ob_type_mtf, type_ob_mtf)
+
+alertcondition(_type == "External Bearish" or _type == "External Bullish" or _type == "Internal Bearish" or _type == "Internal Bullish", "Order Block Created", "New Order Block Found Ez-SMC")
+
+//-----------------------------------------------------------------------------
+// Order Blocks Arrays (Continued)
+//-----------------------------------------------------------------------------
+
+var iob_boxes = array.new_box(0)
+var ob_boxes = array.new_box(0)
+
+var ob_volume = array.new_line(0)
+var ob_volume_labels = array.new_label(0)
+
+var iob_boxes_buy = array.new_box(0)
+var ob_boxes_buy = array.new_box(0)
+
+var iob_boxes_sell = array.new_box(0)
+var ob_boxes_sell = array.new_box(0)
+
+var iob_boxes_mtf = array.new_box(0)
+var ob_boxes_mtf = array.new_box(0)
+
+var ob_volume_mtf = array.new_line(0)
+var ob_volume_labels_mtf = array.new_label(0)
+
+var iob_boxes_buy_mtf = array.new_box(0)
+var ob_boxes_buy_mtf = array.new_box(0)
+
+var iob_boxes_sell_mtf = array.new_box(0)
+var ob_boxes_sell_mtf = array.new_box(0)
+
+if array.size(ob_top_mtf) > in_ob_27
+    array.pop(ob_top_mtf)
+    array.pop(ob_btm_mtf)
+    array.pop(ob_left_mtf)
+    array.pop(ob_type_mtf)
+    array.pop(ob_buy_vol_mtf)
+    array.pop(ob_sell_vol_mtf)
+    array.pop(ob_vol_mtf)
+
+if array.size(ob_top) > in_ob_8
+    array.pop(ob_top)
+    array.pop(ob_btm)
+    array.pop(ob_left)
+    array.pop(ob_type)
+    array.pop(ob_buy_vol)
+    array.pop(ob_sell_vol)
+    array.pop(ob_vol)
+
+// Delete internal order blocks box coordinates if var_ms_s_7/bottom is broken
+if array.size(ob_top_mtf) > 1
+    for index = 0 to array.size(ob_top_mtf) - 1
+        src1 = in_ob_25 == "Wicks" or in_ob_25 == "Touch" ? low : in_ob_25 == "Close" ? close : low
+        src2 = in_ob_25 == "Wicks" or in_ob_25 == "Touch" ? high : in_ob_25 == "Close" ? close : high
+        up = in_ob_25 == "Touch" ? array.get(ob_top_mtf, index) : in_ob_25 == "Average" ? array.get(ob_top_mtf, index) - (array.get(ob_top_mtf, index) - array.get(ob_btm_mtf, index)) / 2 : array.get(ob_btm_mtf, index)
+        dn = in_ob_25 == "Touch" ? array.get(ob_btm_mtf, index) : in_ob_25 == "Average" ? array.get(ob_top_mtf, index) - (array.get(ob_top_mtf, index) - array.get(ob_btm_mtf, index)) / 2 : array.get(ob_top_mtf, index)
+
+        if (src1 < up or src1[1] < up or (in_ob_25 != "Touch" and src1[1] < up)) and array.get(ob_type_mtf, index) == 1
+            array.remove(ob_top_mtf, index)
+            array.remove(ob_btm_mtf, index)
+            array.remove(ob_left_mtf, index)
+            array.remove(ob_type_mtf, index)
+            array.remove(ob_buy_vol_mtf, index)
+            array.remove(ob_sell_vol_mtf, index)
+            array.remove(ob_vol_mtf, index)
+            variable_ms_17 := true
+            break
+        else if (src2 > dn or src2[1] > dn or (in_ob_25 != "Touch" and src2[1] > dn)) and array.get(ob_type_mtf, index) == -1
+            array.remove(ob_top_mtf, index)
+            array.remove(ob_btm_mtf, index)
+            array.remove(ob_left_mtf, index)
+            array.remove(ob_type_mtf, index)
+            array.remove(ob_buy_vol_mtf, index)
+            array.remove(ob_sell_vol_mtf, index)
+            array.remove(ob_vol_mtf, index)
+            variable_ms_18 := true
+            break
+
+if array.size(ob_top) > 1
+    for index = 0 to array.size(ob_top) - 1
+        src1 = in_ob_6 == "Wicks" or in_ob_6 == "Touch" ? low : in_ob_6 == "Close" ? close : low
+        src2 = in_ob_6 == "Wicks" or in_ob_6 == "Touch" ? high : in_ob_6 == "Close" ? close : high
+        up = in_ob_6 == "Touch" ? array.get(ob_top, index) : in_ob_6 == "Average" ? array.get(ob_top, index) - (array.get(ob_top, index) - array.get(ob_btm, index)) / 2 : array.get(ob_btm, index)
+        dn = in_ob_6 == "Touch" ? array.get(ob_btm, index) : in_ob_6 == "Average" ? array.get(ob_top, index) - (array.get(ob_top, index) - array.get(ob_btm, index)) / 2 : array.get(ob_top, index)
+
+        if (src1 < up or src1[1] < up or (in_ob_6 != "Touch" and src1[2] < up)) and array.get(ob_type, index) == 1
+            array.remove(ob_top, index)
+            array.remove(ob_btm, index)
+            array.remove(ob_left, index)
+            array.remove(ob_type, index)
+            array.remove(ob_buy_vol, index)
+            array.remove(ob_sell_vol, index)
+            array.remove(ob_vol, index)
+            variable_ms_17 := true
+            break
+        else if (src2 > dn or src2[1] > dn or (in_ob_6 != "Touch" and src2[2] > dn)) and array.get(ob_type, index) == -1
+            array.remove(ob_top, index)
+            array.remove(ob_btm, index)
+            array.remove(ob_left, index)
+            array.remove(ob_type, index)
+            array.remove(ob_buy_vol, index)
+            array.remove(ob_sell_vol, index)
+            array.remove(ob_vol, index)
+            variable_ms_18 := true
+            break
+
+alertcondition(variable_ms_17 or variable_ms_17, "Order Block Break", "Order Block Broken Ez-SMC")
+
+ob_size_mtf = array.size(ob_type_mtf)
+ob_size = array.size(ob_type)
+
+var first_index_time = true
+if barstate.islast and first_index_time
+    first_index_time:=false
+    if true
+        for i = 0 to in_ob_8 - 1
+            array.push(ob_boxes, box.new(na, na, na, na, xloc=xloc.bar_time))
+            array.push(ob_boxes_buy, box.new(na, na, na, na, xloc=xloc.bar_time))
+            array.push(ob_boxes_sell, box.new(na, na, na, na, xloc=xloc.bar_time))
+            array.push(ob_volume, line.new(na, na, na, na, xloc=xloc.bar_time, color=color.gray, style=line.style_solid, width=1))
+    if true
+        for i = 0 to in_ob_27 - 1
+            array.push(ob_boxes_mtf, box.new(na, na, na, na, xloc=xloc.bar_time))
+            array.push(ob_boxes_buy_mtf, box.new(na, na, na, na, xloc=xloc.bar_time))
+            array.push(ob_boxes_sell_mtf, box.new(na, na, na, na, xloc=xloc.bar_time))
+            array.push(ob_volume_mtf, line.new(na, na, na, na, xloc=xloc.bar_time, color=color.gray, style=line.style_solid, width=1))
+
+if ob_size > 1 and (in_ob_7)
+    [deleted_ob, del_index] = custom_func_22(ob_top, ob_btm, ob_left, ob_type, in_ob_8, false, ob_size)
+    if deleted_ob
+        array.remove(ob_top, del_index)
+        array.remove(ob_btm, del_index)
+        array.remove(ob_left, del_index)
+        array.remove(ob_type, del_index)
+        array.remove(ob_buy_vol, del_index)
+        array.remove(ob_sell_vol, del_index)
+        array.remove(ob_vol, del_index)
+
+if ob_size_mtf > 1 and (in_ob_26)
+    [deleted_ob, del_index] = custom_func_22(ob_top_mtf, ob_btm_mtf, ob_left_mtf, ob_type_mtf, in_ob_27, false, ob_size_mtf)
+    if deleted_ob
+        array.remove(ob_top_mtf, del_index)
+        array.remove(ob_btm_mtf, del_index)
+        array.remove(ob_left_mtf, del_index)
+        array.remove(ob_type_mtf, del_index)
+        array.remove(ob_buy_vol_mtf, del_index)
+        array.remove(ob_sell_vol_mtf, del_index)
+        array.remove(ob_vol_mtf, del_index)
+
+ob_size_mtf := array.size(ob_type_mtf)
+ob_size := array.size(ob_type)
+
+if array.size(ob_boxes) > 1 //and barstate.islast
+    if in_ob_1
+        custom_func_19(ob_boxes, ob_volume, ob_top, ob_btm, ob_left, ob_type, in_ob_8, false, ob_size, ob_vol, in_ob_2, in_ob_3, in_ob_9, in_ob_10, "", "", in_ob_12, in_ob_14, in_ob_15, in_ob_13, in_ob_17, in_ob_19)
+        if in_ob_39 and in_ob_42 == "Zones"
+            custom_func_20(ob_boxes_buy, ob_top, ob_btm, ob_left, ob_type, in_ob_8, false, ob_size,ob_buy_vol,ob_sell_vol)
+            custom_func_21(ob_boxes_sell, ob_top, ob_btm, ob_left, ob_type, in_ob_8, false, ob_size,ob_sell_vol)
+
+
+if array.size(ob_boxes_mtf) > 1 //and barstate.islast
+    if in_ob_20
+        custom_func_19(ob_boxes_mtf, ob_volume_mtf, ob_top_mtf, ob_btm_mtf, ob_left_mtf, ob_type_mtf, in_ob_27, false, ob_size_mtf, ob_vol_mtf, in_ob_21, in_ob_22, in_ob_28, in_ob_29, var_ob_3, var_ob_2, in_ob_31, in_ob_33, in_ob_34, in_ob_32, in_ob_36, in_ob_38)
+        if in_ob_39 and in_ob_42 == "Zones"
+            custom_func_20(ob_boxes_buy_mtf , ob_top_mtf , ob_btm_mtf , ob_left_mtf , ob_type_mtf , in_ob_27 , false, ob_size_mtf ,ob_buy_vol_mtf ,ob_sell_vol_mtf)
+            custom_func_21(ob_boxes_sell_mtf , ob_top_mtf , ob_btm_mtf , ob_left_mtf , ob_type_mtf , in_ob_27 , false, ob_size_mtf ,ob_sell_vol_mtf )
+
+//====================================
+//====================================
+//-----------------------------------------------------------------------------
+// Dealing Range
+//-----------------------------------------------------------------------------
+//====================================
+//====================================
+
+float vp_HH = ta.highest(high, 200)
+float vp_LL = ta.lowest(low, 200)
+float vp_MID = vp_LL + math.abs(vp_HH-vp_LL)/2
+
+var upper_D=box.new(na,na,na,na,bgcolor = in_dr_2,border_color = in_dr_2)
+var lower_D=box.new(na,na,na,na,bgcolor = in_dr_3,border_color = in_dr_3)
+
+if in_dr_1
+
+    box.set_right(upper_D,bar_index+in_dr_4+15)
+    box.set_right(lower_D,bar_index+in_dr_4+15)
+
+    box.set_left(upper_D,bar_index+in_dr_4)
+    box.set_left(lower_D,bar_index+in_dr_4)
+
+    box.set_bottom(upper_D,vp_MID)
+    box.set_bottom(lower_D,vp_LL)
+
+    box.set_top(upper_D,vp_HH)
+    box.set_top(lower_D,vp_MID)
+
+//====================================
+//====================================
+//-----------------------------------------------------------------------------
+// Point of Control
+//-----------------------------------------------------------------------------
+//====================================
+//====================================
+
+
+vp_lookback = 200
+vp_max_bars = 500
+vp_bar_mult = 50
+vp_bar_color = color.new(color.gray, 60)
+
+float vp_Vmax = 0.0
+int vp_VmaxId = 0
+int vp_N_BARS = vp_max_bars
+var int vp_first = time
+vp_a_P = array.new_float(vp_N_BARS + 1, 0.0)
+vp_a_V = array.new_float(vp_N_BARS, 0.0)
+vp_a_D = array.new_float(vp_N_BARS, 0.0)
+vp_a_W = array.new_int(vp_N_BARS, 0)
+
+if barstate.islast
+    float vp_HL = (vp_HH - vp_LL) / vp_N_BARS
+    for j = 1 to vp_N_BARS + 1 by 1
+        array.set(vp_a_P, j - 1, vp_LL + vp_HL * j)
+    for i = 0 to vp_lookback - 1 by 1
+        int Dc = 0
+        array.fill(vp_a_D, 0.0)
+        for j = 0 to vp_N_BARS - 1 by 1
+            float Pj = array.get(vp_a_P, j)
+            if low[i] < Pj and high[i] > Pj and true
+                float Dj = array.get(vp_a_D, j)
+                float dDj = Dj + nz(volume[i])
+                array.set(vp_a_D, j, dDj)
+                Dc += 1
+                Dc
+        for j = 0 to vp_N_BARS - 1 by 1
+            float Vj = array.get(vp_a_V, j)
+            float Dj = array.get(vp_a_D, j)
+            float dVj = Vj + (Dc > 0 ? Dj / Dc : 0.0)
+            array.set(vp_a_V, j, dVj)
+    vp_Vmax := array.max(vp_a_V)
+    vp_VmaxId := array.indexof(vp_a_V, vp_Vmax)
+    for j = 0 to vp_N_BARS - 1 by 1
+        float Vj = array.get(vp_a_V, j)
+        int Aj = math.round(vp_bar_mult * Vj / vp_Vmax)
+        array.set(vp_a_W, j, Aj)
+
+var poc_line= line.new(na,na,na,na)
+var poc_label= label.new(na,na)
+
+if barstate.isfirst
+    vp_first := time
+    vp_first
+vp_change = ta.change(time)
+vp_x_loc = timenow + math.round(vp_change * in_poc_6)
+
+if barstate.islast and in_poc_1
+    x1 = math.max(time[vp_lookback], vp_first)
+    ys = array.get(vp_a_P, vp_VmaxId)
+    line.delete(poc_line)
+    label.delete(poc_label)
+    poc_line := line.new(x1=x1, y1=ys, x2=vp_x_loc, y2=ys, xloc=xloc.bar_time, extend=extend.none, color=in_poc_2, style=in_poc_4, width=in_poc_5)
+    poc_label := label.new(vp_x_loc,ys,in_poc_9 ? "POC" : "",color = #ffffff00,textcolor = in_poc_2,style = label.style_label_left,xloc=xloc.bar_time,size = in_poc_8)
+
+//====================================
+//====================================
+//-----------------------------------------------------------------------------
+// Displacement
+//-----------------------------------------------------------------------------
+//====================================
+//====================================
+
+candle_range = in_dis_4 =="Candle Body" ? math.abs(open - close) : high - low
+std = ta.stdev(candle_range, 100) * in_dis_5
+fvg = close[1] > open[1] ? high[2] < low[0] : low[2] > high[0]
+fvg_range = close[1] > open[1] ? low[0]- high[2] : low[2] - high[0]
+
+displacement = candle_range[1] > std[1] and variable_fvg_18 != 0
+
+bullish_disp = variable_fvg_18 == 1 and displacement
+bearish_disp = variable_fvg_18 == -1 and displacement
+
+if mss_filter_disp
+    s_filter = (bull_mss[1] or bear_mss[1] or bull_bos[1] or bull_bos[1]) or (bull_mss_[1] or bear_mss_[1] or bull_bos_[1] or bull_bos_[1])
+    bullish_disp := bullish_disp and s_filter
+    bearish_disp := bearish_disp and s_filter
+
+barcolor(in_dis_1 and bullish_disp ? in_dis_2 : na, offset = -1)
+barcolor(in_dis_1 and bearish_disp ? in_dis_3 : na, offset = -1)
+
+alertcondition(bullish_disp, "Bullish Displacemet", "Bullish Displacemet Found Ez-SMC")
+alertcondition(bearish_disp, "Bearish Displacemet", "Bearish Displacemet Found Ez-SMC")
+alertcondition(displacement,"Bullish/Bearish Displacemet","Bullish/Bearish Displacemet")
+
+//====================================
+//====================================
+//-----------------------------------------------------------------------------
+// TrendLines
+//-----------------------------------------------------------------------------
+//====================================
+//====================================
+
+var_trln_11 = request.security(ticker.standard(syminfo.tickerid), timeframe.period, close)
+var_trln_12 = request.security(ticker.standard(syminfo.tickerid), timeframe.period, open)
+var_trln_13 = request.security(ticker.standard(syminfo.tickerid), timeframe.period, high)
+var_trln_14 = request.security(ticker.standard(syminfo.tickerid), timeframe.period, low)
+
+
+var line[] var_trln_1 = array.new_line(),var line[] var_trln_2 = array.new_line()
+
+var label[] var_trln_3 = array.new_label(),var label[] var_trln_4 = array.new_label()
+var label[] var_trln_5 = array.new_label(),var label[] var_trln_6 = array.new_label()
+
+
+var_trln_7 = ta.pivothigh(var_trln_13, in_trl_7, in_trl_8)
+var_trln_8 = ta.pivotlow(var_trln_14, in_trl_7, in_trl_8)
+var_trln_9 = ta.pivothigh(var_trln_13, in_trl_7, in_trl_8)
+var_trln_10 = ta.pivotlow(var_trln_14, in_trl_7, in_trl_8)
+
+var float var_trln_15 = na, var float var_trln_16 = na
+var float var_trln_17 = na, var float var_trln_18 = na
+
+var int var_trln_19 = na, var float var_trln_20 = na, var int var_trln_21 = na, var float var_trln_22 = na
+var int var_trln_23 = na, var float var_trln_24 = na, var int var_trln_25 = na, var float var_trln_26 = na
+
+
+in_trl_16        := in_trl_9 ? 0 : in_trl_16
+var_trln_27    = in_trl_16/2
+var_trln_28    = in_trl_16%2==0? in_trl_16/2 : (in_trl_16/2)+1
+
+//functions
+
+cus_func_tl_1(ptype, x1, y1, x2, y2)=>
+    new_trendline = line.new(x1, y1, x2, y2, extend = in_trl_4 ? extend.right : extend.none, color = ptype == 'var_trln_9' ? in_trl_2 : in_trl_3, width = in_trl_6,style = in_trl_20,xloc = xloc.bar_index)
+    if ptype == 'var_trln_9'
+        var_trln_1.unshift(new_trendline)
+        label_1 = label.new(x1,y1,color = #4caf4f00,style = label.style_circle,size = size.auto)
+        label_2 = label.new(x2,y2,color = #4caf4f00,style = label.style_circle,size = size.auto)
+        var_trln_3.unshift(label_1)
+        var_trln_5.unshift(label_2)
+
+    else
+        var_trln_2.unshift(new_trendline)
+        label_1 = label.new(x1,y1,color = #4caf4f00,style = label.style_circle,size = size.auto)
+        label_2 = label.new(x2,y2,color = #4caf4f00,style = label.style_circle,size = size.auto)
+        var_trln_4.unshift(label_1)
+        var_trln_6.unshift(label_2)
+
+cus_func_tl_2(line)=>
+    slopePh = (line.get_y2(line) - line.get_y1(line))/(line.get_x2(line) -line.get_x1(line))
+    extendedPh = line.get_y2(line) - slopePh * (line.get_x2(line) - bar_index)
+    extendedPh
+
+cus_func_tl_3(line,n)=>
+    slopePh = (line.get_y2(line) - line.get_y1(line))/(line.get_x2(line) -line.get_x1(line))
+    extendedPh = line.get_y1(line) + slopePh * (n)
+    extendedPh
+
+var_trln_29= false
+var_trln_30 = false
+
+if var_trln_10
+    var_trln_19 := var_trln_21, var_trln_20 := var_trln_22, var_trln_17 := var_trln_18
+    var_trln_21 := bar_index[in_trl_8], var_trln_22 := var_trln_14[in_trl_8], var_trln_18:= var_trln_11[in_trl_8]
+    if var_trln_20 < var_trln_22 and in_trl_1 and var_trln_22 > var_trln_17
+        valid = true
+        for i = var_trln_19 to var_trln_21 by 1
+            slopePh = (var_trln_22 - var_trln_20)/(var_trln_21 -var_trln_19 )
+            line_val = var_trln_20  - slopePh * (var_trln_19 -i)
+            if low[bar_index - i] < line_val
+                //label.new(i,low[bar_index - i],"S")
+                valid := false
+        if valid
+            cus_func_tl_1('var_trln_10', var_trln_19, var_trln_20, var_trln_21, var_trln_22)
+            var_trln_30:=true
+
+if var_trln_9
+    var_trln_25 := var_trln_23, var_trln_26 := var_trln_24, var_trln_15 := var_trln_16
+    var_trln_23 := bar_index[in_trl_8], var_trln_24 := var_trln_13[in_trl_8], var_trln_16:= var_trln_11[in_trl_8]
+
+    if var_trln_26 > var_trln_24 and in_trl_1 and var_trln_15 > var_trln_24
+        valid = true
+        for i = var_trln_25 to var_trln_23 by 1
+            slopePh = (var_trln_24 - var_trln_26)/(var_trln_23 -var_trln_25)
+            line_val = var_trln_26 - slopePh * (var_trln_25-i)
+            if high[bar_index - i] > line_val
+                //label.new(i,high[bar_index - i],"B")
+                valid := false
+        if valid
+            cus_func_tl_1('var_trln_9', var_trln_25, var_trln_26, var_trln_23, var_trln_24)
+            var_trln_29 := true
+
+
+if close > var_trln_26
+    var_trln_26:=0.000000
+
+if close < var_trln_20
+    var_trln_20:= 9999999999.9999
+
+
+// alertcondition(var_trln_29,'Up TrendLine Formed','Up TrendLine Formed')
+// alertcondition(var_trln_30,'Down TrendLine Formed','Down TrendLine Formed')
+alertcondition(var_trln_30 or var_trln_29,'Trendline Formed','Trendline Formed')
+
+var_trln_31 = false
+var_trln_32 = false
+
+for x in var_trln_2
+    var line [] var_trln_33 = array.new_line(var_trln_27)
+    var label [] var_trln_34 = array.new_label(var_trln_27)
+    src = in_trl_17 == 'Close' ? var_trln_11 : var_trln_14
+    x.set_xy2(bar_index, cus_func_tl_2(x))
+    if x.get_x2() - x.get_x1() > 300
+        x.delete()
+    if src < line.get_y2(x)
+        tl_line = line.new(line.get_x1(x), line.get_y1(x), line.get_x2(x), line.get_y2(x), color = in_trl_11, style = in_trl_21, width = in_trl_19,xloc = xloc.bar_index, extend = in_trl_12 ? extend.right : extend.none)
+        var_trln_32:=true
+        var_trln_33.unshift(tl_line)
+        line.delete(x)
+    if var_trln_33.size() > (var_trln_27)
+        line.delete(var_trln_33.pop())
+
+for x in var_trln_1
+    var line [] var_trln_35 = array.new_line(var_trln_28)
+    var label [] var_trln_36 = array.new_label(var_trln_28)
+    src = in_trl_17 == 'Close' ? var_trln_11 : var_trln_13
+    x.set_xy2(bar_index, cus_func_tl_2(x))
+    if x.get_x2() - x.get_x1() > 300
+        x.delete()
+    if src > line.get_y2(x)
+        tl_line = line.new(line.get_x1(x), line.get_y1(x), line.get_x2(x), line.get_y2(x), color = in_trl_10, style = in_trl_21, width = in_trl_19,xloc = xloc.bar_index, extend = in_trl_12 ? extend.right : extend.none)
+        var_trln_31:=true
+        var_trln_35.unshift(tl_line)
+        line.delete(x)
+    if var_trln_35.size() > (var_trln_28)
+        line.delete(var_trln_35.pop())
+    line_range =x.get_x2() - x.get_x1()
+
+if var_trln_3.size() > in_trl_16
+    label.delete(var_trln_3.pop())
+    label.delete(var_trln_5.pop())
+
+if var_trln_4.size() > in_trl_16
+    label.delete(var_trln_4.pop())
+    label.delete(var_trln_6.pop())
+
+
+plotshape(in_trl_13 and var_trln_31? low : na, title='Trendline Broken Up', style=shape.xcross, textcolor=color.new(color.white, 0), size=size.small, location=location.belowbar, color=in_trl_14,display=  display.all - display.status_line, editable = false)
+plotshape(in_trl_13 and var_trln_32? high : na, title='Trendline Broken Down', style=shape.xcross,  textcolor=color.new(color.white, 0), size=size.small, location=location.abovebar, color=in_trl_15,display=  display.all - display.status_line, editable = false)
+
+// alertcondition(var_trln_31,'Up TrendLine Broken','Up TrendLine Broken')
+// alertcondition(var_trln_32,'Down TrendLine Broken','Down TrendLine Broken')
+alertcondition(var_trln_31 or var_trln_32,'Trendline Broken','Trendline Broken')

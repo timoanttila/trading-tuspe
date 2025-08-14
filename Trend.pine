@@ -1,0 +1,198 @@
+// A simple trend-following strategy using multiple moving averages
+// and price action to generate entries and exits.
+// Best for trending markets.
+// © timoanttila
+
+//@version=6
+indicator("Trend is your best friend [Timo]", shorttitle="Trend", overlay=true)
+
+// ----------
+//  Moving Averages
+// ----------
+
+group1 = "Moving Averages"
+ma1_length = input.int(9, title="Short Length", minval=1, group=group1)
+ma1_type = input.string("SMA", title="Short Type", options=["SMA", "EMA"], group=group1)
+
+ma2_length = input.int(20, title="Medium Length", minval=1, group=group1)
+ma2_type = input.string("EMA", title="Medium Type", options=["SMA", "EMA"], group=group1)
+
+ma3_length = input.int(200, title="Long Length", minval=1, group=group1)
+ma3_type = input.string("SMA", title="Long Type", options=["SMA", "EMA"], group=group1)
+
+cross_type_input = input.string("MA Cross", title="Cross Type", options=["MA Cross", "Close"], group=group1)
+
+// Moving average calculation function
+calculate_ma(ma_type, src, length) =>
+    ma_type == "SMA" ? ta.sma(src, length) : ta.ema(src, length)
+
+// Calculate the moving averages
+ma1 = calculate_ma(ma1_type, close, ma1_length)
+ma2 = calculate_ma(ma2_type, close, ma2_length)
+ma3 = calculate_ma(ma3_type, close, ma3_length)
+
+// Plot moving averages
+plot(ma1, color=color.aqua, linewidth=1, title="Cross MA1")
+plot(ma2, color=color.yellow, linewidth=2, title="Cross MA2")
+plot(ma3, color=color.white, linewidth=2, title="Long Trend MA")
+
+// ----------
+//  Global Variables
+// ----------
+
+bool candle_bull = close > open
+float body_size = math.abs(close - open)
+float full_size = math.abs(high - low)
+float candle_body_percent = full_size > 0 ? (body_size / full_size) * 100 : 0
+var int entry = 0
+var int exit = 0
+var int trend = 0
+
+// ----------
+//  Crossover
+// ----------
+
+cross_type = cross_type_input == 'Close' ? close : ma1
+bool trend_cross_bull = ta.crossover(cross_type, ma2)
+bool trend_cross_bear = ta.crossunder(cross_type, ma2)
+
+if trend_cross_bull or trend_cross_bear
+    entry := 0
+    trend := trend_cross_bull ? 1 : 2
+
+// ----------
+//  Exit
+// ----------
+
+bool exit_cross = ta.cross(close, ma1)
+
+if entry == 2 and exit_cross and ((trend == 1 and open > close) or (trend == 2 and close > open))
+    entry := 0
+    exit := trend
+
+// ----------
+//  Entry
+// ----------
+
+if entry == 0 and volume > volume[1] and volume > volume[2] and candle_body_percent > 40 and ((trend == 1 and close > ma1 and open > ma1 and candle_bull) or (trend == 2 and ma1 > close and ma1 > open and not candle_bull))
+    entry := 1
+
+plotshape(entry == 1 and trend == 1, title="Long Entry", style=shape.triangleup, location=location.belowbar, color=color.white, size=size.tiny)
+plotshape(entry == 1 and trend == 2, title="Short Entry", style=shape.triangledown, location=location.abovebar, color=color.white, size=size.tiny)
+plotshape(exit == 1, title="Exit Long", style=shape.cross, location=location.belowbar, color=color.gray, size=size.tiny)
+plotshape(exit == 2, title="Exit Short", style=shape.cross, location=location.abovebar, color=color.gray, size=size.tiny)
+
+// ----------
+//  Previous Day High and Low (Only active on < 4H)
+// ----------
+
+// User input for color
+lineAndTextColor = input.color(color.white, "PDH/PDL line and text color", group="Previous Day")
+
+// Only run on timeframes less than 4 hours (14400000 ms)
+pdActive = timeframe.in_seconds() <= 14400
+
+// Detect new day
+currDay = dayofweek
+currSession = dayofmonth
+newDay = currDay != currDay[1] or currSession != currSession[1]
+
+// Get previous day high and low
+[dh, dl] = request.security(syminfo.tickerid, "D", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+
+// Track the start bar for drawing
+var int startBar = na
+if pdActive and newDay
+    startBar := bar_index
+
+// Draw persistent lines and text
+var line lineHigh = na
+var line lineLow = na
+var label textHigh = na
+var label textLow = na
+
+if pdActive and newDay
+    if not na(lineHigh)
+        line.delete(lineHigh)
+    if not na(lineLow)
+        line.delete(lineLow)
+    if not na(textHigh)
+        label.delete(textHigh)
+    if not na(textLow)
+        label.delete(textLow)
+
+    // Calculate endBar for current day + 5 future bars
+    endBar = bar_index + 5
+
+    lineHigh := line.new(x1=startBar, y1=dh, x2=endBar, y2=dh, color=lineAndTextColor, width=1)
+    lineLow  := line.new(x1=startBar, y1=dl, x2=endBar, y2=dl, color=lineAndTextColor, width=1)
+
+    // Text label position (same as line end)
+    transparent = color.new(lineAndTextColor, 100)
+    textHigh := label.new(x=endBar, y=dh, text="PDH", style=label.style_label_left, textcolor=lineAndTextColor, size=size.small, color=transparent)
+    textLow  := label.new(x=endBar, y=dl, text="PDL", style=label.style_label_left, textcolor=lineAndTextColor, size=size.small, color=transparent)
+
+// Keep updating end of line and text position for current day + 5 future bars
+if pdActive and not na(lineHigh)
+    line.set_x2(lineHigh, bar_index + 5)
+if pdActive and not na(lineLow)
+    line.set_x2(lineLow, bar_index + 5)
+if pdActive and not na(textHigh)
+    label.set_x(textHigh, bar_index + 5)
+if pdActive and not na(textLow)
+    label.set_x(textLow, bar_index + 5)
+
+// Alert condition
+insidePrevDayRange = open >= dl and open <= dh
+breaksAbove = high > dh and insidePrevDayRange
+breaksBelow = low < dl and insidePrevDayRange
+
+// ----------
+//  Displacement
+// ----------
+
+group4 = "Displacement Candle"
+rangeType = input.string("Open to Close", "Range Type", options = ['Open to Close', 'High to Low'], group=group4)
+devPeriod = input.int(100, minval = 1, title = "Deviation Period", group=group4)
+devMultiplier = input.int(2, minval = 0, title = "Deviation Multiplier", group=group4)
+
+priceRange = rangeType == "Open to Close" ? math.abs(open - close) : full_size
+rangeDeviation = ta.stdev(priceRange, devPeriod) * devMultiplier
+
+priceGap = close[1] > open[1] ? high[2] < low[0] : low[2] > high[0]
+isDisplaced = priceRange[1] > rangeDeviation[1] and priceGap
+
+barcolor(isDisplaced ? color.maroon : na, offset = -1, title="Displacement Bar")
+
+// ----------
+//  Inside Bar
+// ----------
+
+prev_candle_high = high[1]
+prev_candle_low = low[1]
+prev_full_size = math.abs(prev_candle_high - prev_candle_low)
+
+isInsideBar = barstate.isconfirmed and full_size < prev_full_size and prev_candle_high > high and prev_candle_low < low
+barcolor(isInsideBar ? color.yellow : na, title="Inside Bar")
+
+// ----------
+// Alerts
+// ----------
+
+alertcondition(entry == 1, title="New Entry", message="New entry signal on {{ticker}}. Good luck and happy trading!")
+alertcondition(entry == 1 and trend == 1, title="New Long Entry", message="New long entry signal on {{ticker}}.")
+alertcondition(entry == 1 and trend == 2, title="New Short Entry", message="New short entry signal on {{ticker}}.")
+alertcondition(exit > 0, title="Exit", message="It might be a good time to exit the active trade on {{ticker}}.")
+alertcondition(pdActive and (breaksAbove or breaksBelow), title="Previous Day Range", message="Price opened inside previous day and broke above or below. Good luck and happy trading!")
+alertcondition(isDisplaced, title="Elephant Bar", message="New Displacement / Elephant Bar detected!")
+alertcondition(isInsideBar, title="Inside Bar", message="New Inside Bar detected!")
+
+// ----------
+//  Reset
+// ----------
+
+if entry == 1
+    entry := 2
+
+if exit > 0
+    exit := 0
